@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="ENORYS — an interactive cognitive agent simulation. Explore witnesses, rumors, relationships and explainable decisions.">
+  <title>ENORYS — Cognitive Sandbox</title>
+  <link rel="stylesheet" href="./web/style.css">
+  <script type="module" src="./web/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="ENORYS home"><span class="brand-mark">◈</span> ENORYS <span class="brand-sub">/ cognitive sandbox</span></a>
+    <a class="repo" href="https://github.com/Pivtorak-a/ENORYS" target="_blank" rel="noreferrer">Source on GitHub ↗</a>
+  </header>
+  <main class="shell">
+    <div class="intro"><p class="eyebrow">EXPERIMENT 001 · OBSERVATION &amp; TRUST</p>
+      <h1>Small rules.<br><span>Different stories.</span></h1>
+      <p>Observe agents sharing supplies, taking from a common cache and spreading reports. Change what they can witness. Inspect why they chose each action.</p>
+    </div>
+    <section class="panel controls" aria-label="Simulation controls">
+      <label>Random seed <input id="seed" type="number" min="0" max="4294967295" value="42"></label>
+      <label>Agents <input id="agents" type="number" min="6" max="60" value="24"></label>
+      <label class="witness">Witness chance <span id="witness-label">50%</span><input id="witness" type="range" min="0" max="100" value="50"></label>
+      <div class="actions"><button id="reset" class="secondary">Reset</button><button id="step">+1 decision</button><button id="run">+100 decisions →</button></div>
+    </section>
+    <section class="metrics" aria-label="Metrics">
+      <div class="panel metric"><span>Decisions</span><strong id="ticks">0</strong></div>
+      <div class="panel metric"><span>Cache supplies</span><strong id="cache">0</strong></div>
+      <div class="panel metric"><span>Cache taken</span><strong id="takes">0</strong></div>
+      <div class="panel metric"><span>Donations</span><strong id="donations">0</strong></div>
+      <div class="panel metric"><span>Reports passed</span><strong id="reports">0</strong></div>
+    </section>
+    <div class="layout">
+      <section class="panel span-2"><div class="section-head"><h2>Event stream</h2><span class="small">Latest 16 actions</span></div>
+        <div id="events" class="events" aria-live="polite"></div></section>
+      <section class="panel"><div class="section-head"><h2>Decision Inspector</h2><span class="small">Latest action</span></div>
+        <div id="decision" class="decision"></div></section>
+      <section class="panel"><div class="section-head"><h2>Agent Explorer</h2><label class="small" for="selected-agent">Select agent</label></div>
+        <select id="selected-agent" aria-label="Select agent"></select><div id="agent-detail" class="agent-detail"></div></section>
+      <section class="panel span-2"><div class="section-head"><h2>Counterfactual experiment</h2><span class="small">Same agents &amp; seed, different visibility</span></div>
+        <p class="hint">Two independent runs of 300 decisions. Only the chance that an event is witnessed changes.</p>
+        <button id="compare" class="secondary">Compare 0% vs 100% witnesses</button><div id="comparison" class="comparison"></div></section>
+    </div>
+    <p class="footnote">Early public learning prototype · no LLM · no claim of human-like psychology · deterministic within this JS runtime. Source is auditable. <a href="https://github.com/Pivtorak-a/ENORYS/issues" target="_blank" rel="noreferrer">Report an issue ↗</a></p>
+  </main>
+</body>
+</html>
