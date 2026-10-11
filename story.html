@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="ENORYS Story Lab: run reproducible multi-agent histories from needs, unreliable perception and social decisions.">
+<title>ENORYS — Story Lab</title>
+<link rel="stylesheet" href="./web/style.css"><link rel="stylesheet" href="./web/story.css">
+<script type="module" src="./web/story.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a href="./" class="brand"><span class="brand-mark">◈</span> ENORYS <span class="brand-sub">/ story lab</span></a>
+  <div class="header-links"><a href="./index.html">Original sandbox</a><a href="https://github.com/Pivtorak-a/ENORYS" target="_blank" rel="noopener noreferrer">Source on GitHub ↗</a></div>
+</header>
+<main class="shell story-shell">
+  <div class="intro"><p class="eyebrow">EXPERIMENT 002 · AUTONOMOUS CONSEQUENCES</p>
+    <h1>One world.<br><span>Many possible histories.</span></h1>
+    <p>Agents forage, steal, witness, talk, investigate, accuse, defend and make restitution. No written plot: choices arise from private memories, goals and utility scores.</p>
+  </div>
+  <form class="panel story-controls" id="controls">
+    <label>Seed<input id="seed" name="seed" type="number" min="0" max="4294967295" value="42" required></label>
+    <label>Simulation days<input id="days" name="days" type="number" min="1" max="40" value="12" required></label>
+    <label>Witness visibility <span id="visibility-number">30%</span><input id="visibility" name="visibility" type="range" min="0" max="100" value="30"></label>
+    <label>Wrong identification <span id="error-number">10%</span><input id="error-rate" name="error-rate" type="range" min="0" max="35" value="10"></label>
+    <label class="check-label"><input type="checkbox" id="gossip" checked> Enable private rumors</label>
+    <button type="submit">Generate a history →</button>
+  </form>
+  <div role="alert" id="errors" class="error-message" hidden></div>
+  <section class="metrics story-metrics" aria-label="Experiment summary">
+    <div class="panel metric"><span>Stock incidents</span><strong id="takes">–</strong></div>
+    <div class="panel metric"><span>Accusations</span><strong id="accuse">–</strong></div>
+    <div class="panel metric"><span>Wrong accusations</span><strong id="wrong">–</strong></div>
+    <div class="panel metric"><span>Restitution</span><strong id="repay">–</strong></div>
+    <div class="panel metric"><span>Starvation-days</span><strong id="starve">–</strong></div>
+  </section>
+  <div class="story-layout">
+    <section class="panel chronicle">
+      <div class="section-head"><h2>Chronicle</h2><span class="small" id="count">24 agents · 12 days</span></div>
+      <div class="filters"><label>Trace a specific incident<select id="incident" aria-label="Choose incident"></select></label>
+      <label class="check-label"><input id="show-truth" type="checkbox" checked> Reveal objective truth</label></div>
+      <p class="hint">Select any event to examine the agent’s own evidence and exact decision scores.</p>
+      <div id="timeline" class="timeline"></div>
+    </section>
+    <aside class="panel inspector">
+      <div class="section-head"><h2>Why did this happen?</h2><span class="small">Decision Inspector</span></div>
+      <div id="inspection" class="inspection-content"><p class="empty">Choose an event in the timeline.</p></div>
+      <div class="section-head gap-top"><h2>Counterfactual</h2><span class="small">Same seed, gossip off</span></div>
+      <button class="secondary" type="button" id="compare">Run alternative history</button>
+      <div id="alternatives" class="alternative"></div>
+    </aside>
+  </div>
+  <p class="footnote">Research toy, not a model of human psychology. Narration shows world truth only when enabled; real agents cannot access that truth. <a href="https://github.com/Pivtorak-a/ENORYS/blob/main/docs/EXPERIMENT-002.md" target="_blank" rel="noopener noreferrer">Methods and limitations ↗</a></p>
+</main>
+</body>
+</html>

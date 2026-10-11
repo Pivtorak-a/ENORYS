@@ -30,6 +30,20 @@ npm test
 - Run a **counterfactual comparison** with the same seed and agents but 0% vs 100% witness chance.
 - File issues with your seed, agent count, witness chance and steps so others can reproduce behavior.
 
+## Multi-agent Story Lab (Experiment 002)
+
+**New:** [Open Story Lab](./story.html) to run a 24-agent settlement with resource scarcity, fallible eyewitness identification, rumors, investigations, public accusations, defense, restitution and guarding. Change the seed, visibility, gossip and perception errors to generate different **12-day histories**. Select an incident and click any event to inspect the agent's private evidence and decision utilities.
+
+This is a **reproducible JavaScript research prototype**, not a fully validated cognitive model or the headless .NET engine.
+
+```bash
+python3 -m http.server 8000  # open http://localhost:8000/story.html
+node scripts/experiment-002.mjs 42 12
+npm test
+```
+
+[Experiment 002: measured behavior and limitations](docs/EXPERIMENT-002.md).
+
 ## Reproducible NPC belief experiment
 
 A **40-agent, one-event counterfactual** compares analytical eyewitness expectations with 1,000 seeded simulations. It demonstrates differing subjective beliefs, decision utilities, rumor effects and a hidden-world-fact isolation test. It is a **JavaScript research harness**, not the full C# engine or validation of human psychology.
