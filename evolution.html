@@ -1,0 +1,37 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="ENORYS v0.4 - 4 phase autonomous agents sandbox: survival domain, multistep plans, social memory and cognitive LOD.">
+<title>ENORYS — Agent Evolution Lab</title>
+<link rel="stylesheet" href="./web/style.css"><link rel="stylesheet" href="./web/evolution.css">
+<script type="module" src="./web/evolution.js"></script>
+</head><body>
+<header class="topbar"><a href="./index.html" class="brand"><span class="brand-mark">◈</span> ENORYS <span class="brand-sub">/ agent evolution lab</span></a><a class="repo" href="https://github.com/Pivtorak-a/ENORYS" target="_blank" rel="noreferrer">Source ↗</a></header>
+<main class="shell">
+<div class="intro"><p class="eyebrow">RESEARCH · EXPERIMENT 004 · FOUR DEVELOPMENT GATES</p>
+<h1>Agents that <span>plan, remember &amp; adapt.</span></h1>
+<p>Reproducible, headless simulation. Each character has nine needs, fourteen item categories, a bounded planner, private evidence and social debts. Change conditions and inspect decisions without an LLM.</p></div>
+<section class="panel controls-evolution" aria-label="Simulation configuration">
+<label>Seed<input id="seed" type="number" min="0" max="4294967295" value="42"></label>
+<label>Agents<input id="agents" type="number" min="12" max="500" value="24"></label>
+<label>Days<input id="days" type="number" min="1" max="100" value="18"></label>
+<label>Resource supply <output id="resources-label">50%</output><input id="resources" type="range" min="0" max="200" value="50"></label>
+<label>Witness probability <output id="visibility-label">55%</output><input id="visibility" type="range" min="0" max="100" value="55"></label>
+<div class="switches"><label><input id="planning" type="checkbox" checked>Multi-step planning</label><label><input id="lod" type="checkbox" checked>Cognitive LOD</label><label><input id="social" type="checkbox" checked>Social decisions</label></div>
+<div class="evo-actions"><button id="start">Run simulation</button><button id="compare" class="secondary">Compare without planning</button></div>
+</section>
+<p id="run-status" class="run-status" aria-live="polite">Ready to run.</p>
+<div class="metrics-evolution">
+<div class="panel metric"><span>Alive</span><strong id="alive">—</strong></div>
+<div class="panel metric"><span>Average health</span><strong id="health">—</strong></div>
+<div class="panel metric"><span>Completed plans</span><strong id="plans">—</strong></div>
+<div class="panel metric"><span>Automatic actions</span><strong id="automatic">—</strong></div>
+<div class="panel metric"><span>Accepted actions</span><strong id="actions">—</strong></div>
+</div>
+<div class="evo-layout">
+<section class="panel"><div class="section-head"><h2>Needs after the final day</h2><span class="small">Higher = less satisfied</span></div><div id="needs-graph"></div></section>
+<section class="panel"><div class="section-head"><h2>Social consequences</h2><span class="small">Counts in this run</span></div><div id="social-stats"></div><div id="comparison" class="comparison"></div></section>
+<section class="panel wide"><div class="section-head"><h2>Autonomous event history</h2><span class="small">Filtered to 90 interactions</span></div><div id="chronicle" class="chronicle"></div></section>
+<section class="panel wide"><div class="section-head"><h2>Agent Inspector</h2><select id="agent-picker" aria-label="Choose agent"></select></div><div id="agent-inspector" class="evo-inspector"></div></section>
+</div>
+<p class="footnote">Toy research environment. Inputs, coefficients and generated narratives are experimental; no claim of human-like cognition. The browser UI uses JavaScript, while the C#/.NET production kernel is still separate and incomplete. <a href="https://github.com/Pivtorak-a/ENORYS/blob/main/docs/EXPERIMENT-004.md" target="_blank" rel="noreferrer">Experiment and limitations ↗</a></p>
+</main></body></html>
