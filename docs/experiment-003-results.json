@@ -1,0 +1,437 @@
+{
+  "trials": 80,
+  "actors": 24,
+  "days": 12,
+  "turnsPerDay": 3,
+  "decisionsPerRun": 864,
+  "single": {
+    "baseline": {
+      "alive": 24,
+      "dead": 0,
+      "meanHealth": 90.186,
+      "uniqueActions": 25,
+      "give": 23,
+      "ask": 44,
+      "take": 11,
+      "accurateAccusations": 10,
+      "falseAccusations": 3,
+      "eat": 71,
+      "drink": 83,
+      "sleep": 95,
+      "wash": 17,
+      "treat": 2,
+      "bandage": 1,
+      "build_shelter": 3,
+      "build_latrine": 0,
+      "relieve": 112,
+      "scavenge": 68,
+      "boil": 59,
+      "cook": 44,
+      "socialize": 49,
+      "meanNeeds": {
+        "hunger": 33.958,
+        "thirst": 39.292,
+        "fatigue": 30.875,
+        "cold": 33.667,
+        "hygiene": 65.625,
+        "bladder": 18.75,
+        "safety": 59.375,
+        "belonging": 45.25,
+        "morale": 58.375
+      },
+      "balanced": true,
+      "turns": 864
+    },
+    "scarce": {
+      "alive": 24,
+      "dead": 0,
+      "meanHealth": 81.978,
+      "uniqueActions": 25,
+      "give": 18,
+      "ask": 42,
+      "take": 6,
+      "accurateAccusations": 7,
+      "falseAccusations": 3,
+      "eat": 69,
+      "drink": 76,
+      "sleep": 97,
+      "wash": 5,
+      "treat": 1,
+      "bandage": 2,
+      "build_shelter": 2,
+      "build_latrine": 1,
+      "relieve": 106,
+      "scavenge": 185,
+      "boil": 42,
+      "cook": 35,
+      "socialize": 43,
+      "meanNeeds": {
+        "hunger": 45.767,
+        "thirst": 62.875,
+        "fatigue": 52.042,
+        "cold": 42.792,
+        "hygiene": 90.5,
+        "bladder": 27.083,
+        "safety": 67.667,
+        "belonging": 57.5,
+        "morale": 65.75
+      },
+      "balanced": true,
+      "turns": 864
+    },
+    "freezing": {
+      "alive": 24,
+      "dead": 0,
+      "meanHealth": 87.945,
+      "uniqueActions": 24,
+      "give": 27,
+      "ask": 47,
+      "take": 13,
+      "accurateAccusations": 9,
+      "falseAccusations": 3,
+      "eat": 68,
+      "drink": 77,
+      "sleep": 95,
+      "wash": 17,
+      "treat": 3,
+      "bandage": 1,
+      "build_shelter": 2,
+      "build_latrine": 0,
+      "relieve": 107,
+      "scavenge": 78,
+      "boil": 52,
+      "cook": 40,
+      "socialize": 45,
+      "meanNeeds": {
+        "hunger": 38.892,
+        "thirst": 47.583,
+        "fatigue": 33.792,
+        "cold": 40.417,
+        "hygiene": 65.292,
+        "bladder": 28.125,
+        "safety": 66.167,
+        "belonging": 50.25,
+        "morale": 61.542
+      },
+      "balanced": true,
+      "turns": 864
+    },
+    "isolated": {
+      "alive": 24,
+      "dead": 0,
+      "meanHealth": 89.883,
+      "uniqueActions": 20,
+      "give": 19,
+      "ask": 43,
+      "take": 13,
+      "accurateAccusations": 0,
+      "falseAccusations": 0,
+      "eat": 73,
+      "drink": 86,
+      "sleep": 97,
+      "wash": 17,
+      "treat": 1,
+      "bandage": 1,
+      "build_shelter": 2,
+      "build_latrine": 0,
+      "relieve": 117,
+      "scavenge": 74,
+      "boil": 63,
+      "cook": 45,
+      "socialize": 48,
+      "meanNeeds": {
+        "hunger": 31.271,
+        "thirst": 37.125,
+        "fatigue": 32.167,
+        "cold": 31.375,
+        "hygiene": 65.958,
+        "bladder": 15.625,
+        "safety": 67.25,
+        "belonging": 47.292,
+        "morale": 58.25
+      },
+      "balanced": true,
+      "turns": 864
+    }
+  },
+  "statistics": {
+    "baseline": {
+      "alive": 24,
+      "dead": 0,
+      "meanHealth": 88.338,
+      "uniqueActions": 23.625,
+      "give": 23.75,
+      "ask": 44.575,
+      "take": 15.275,
+      "accurateAccusations": 11.287,
+      "falseAccusations": 1,
+      "eat": 70.55,
+      "drink": 81.275,
+      "sleep": 94.275,
+      "wash": 14.75,
+      "treat": 1.988,
+      "bandage": 1.012,
+      "build_shelter": 0.887,
+      "build_latrine": 0,
+      "relieve": 112.625,
+      "scavenge": 82.15,
+      "boil": 52.8,
+      "cook": 41,
+      "socialize": 46.763,
+      "meanNeeds": {
+        "hunger": 35.549,
+        "thirst": 45.594,
+        "fatigue": 34.451,
+        "cold": 35.177,
+        "hygiene": 70.106,
+        "bladder": 21.393,
+        "safety": 64.984,
+        "belonging": 47.262,
+        "morale": 61.227
+      },
+      "balanced": true
+    },
+    "scarce": {
+      "alive": 23.9,
+      "dead": 0.1,
+      "meanHealth": 74.188,
+      "uniqueActions": 23.762,
+      "give": 16.913,
+      "ask": 40.825,
+      "take": 5.862,
+      "accurateAccusations": 8.85,
+      "falseAccusations": 0.838,
+      "eat": 64.388,
+      "drink": 69.263,
+      "sleep": 97.475,
+      "wash": 5.675,
+      "treat": 1.5,
+      "bandage": 0.875,
+      "build_shelter": 0.588,
+      "build_latrine": 0.85,
+      "relieve": 100.925,
+      "scavenge": 215.25,
+      "boil": 35.725,
+      "cook": 32.563,
+      "socialize": 37.875,
+      "meanNeeds": {
+        "hunger": 57.119,
+        "thirst": 71.202,
+        "fatigue": 55.699,
+        "cold": 44.823,
+        "hygiene": 91.585,
+        "bladder": 35.717,
+        "safety": 66.606,
+        "belonging": 65.507,
+        "morale": 74.057
+      },
+      "balanced": true
+    },
+    "freezing": {
+      "alive": 23.988,
+      "dead": 0.013,
+      "meanHealth": 83.492,
+      "uniqueActions": 23.5,
+      "give": 27.475,
+      "ask": 48.288,
+      "take": 15.55,
+      "accurateAccusations": 9.963,
+      "falseAccusations": 0.713,
+      "eat": 68.838,
+      "drink": 78.775,
+      "sleep": 92.95,
+      "wash": 13.875,
+      "treat": 2,
+      "bandage": 1.075,
+      "build_shelter": 0.938,
+      "build_latrine": 0,
+      "relieve": 108.55,
+      "scavenge": 86.287,
+      "boil": 48.737,
+      "cook": 37.813,
+      "socialize": 45.388,
+      "meanNeeds": {
+        "hunger": 38.191,
+        "thirst": 49.62,
+        "fatigue": 36.816,
+        "cold": 47.793,
+        "hygiene": 70.994,
+        "bladder": 23.699,
+        "safety": 63.957,
+        "belonging": 48.637,
+        "morale": 63.722
+      },
+      "balanced": true
+    },
+    "isolated": {
+      "alive": 24,
+      "dead": 0,
+      "meanHealth": 88.967,
+      "uniqueActions": 19.012,
+      "give": 25.063,
+      "ask": 42.513,
+      "take": 15.6,
+      "accurateAccusations": 0,
+      "falseAccusations": 0,
+      "eat": 72.275,
+      "drink": 84.525,
+      "sleep": 97.575,
+      "wash": 15.35,
+      "treat": 1.65,
+      "bandage": 1.038,
+      "build_shelter": 0.975,
+      "build_latrine": 0,
+      "relieve": 114.05,
+      "scavenge": 87.412,
+      "boil": 56.837,
+      "cook": 44.05,
+      "socialize": 46.962,
+      "meanNeeds": {
+        "hunger": 34.769,
+        "thirst": 43.014,
+        "fatigue": 33.668,
+        "cold": 32.776,
+        "hygiene": 69.175,
+        "bladder": 20.638,
+        "safety": 69.179,
+        "belonging": 46.47,
+        "morale": 60.28
+      },
+      "balanced": true
+    }
+  },
+  "paired": {
+    "scarce": {
+      "meanHealth": {
+        "delta": -14.15,
+        "ci95": [
+          -16.011,
+          -12.289
+        ]
+      },
+      "alive": {
+        "delta": -0.1,
+        "ci95": [
+          -0.175,
+          -0.025
+        ]
+      },
+      "give": {
+        "delta": -6.838,
+        "ci95": [
+          -7.863,
+          -5.812
+        ]
+      },
+      "falseAccusations": {
+        "delta": -0.163,
+        "ci95": [
+          -0.3,
+          -0.025
+        ]
+      },
+      "meanNeeds.thirst": {
+        "delta": 25.607,
+        "ci95": [
+          23.841,
+          27.373
+        ]
+      },
+      "meanNeeds.cold": {
+        "delta": 9.646,
+        "ci95": [
+          8.396,
+          10.895
+        ]
+      }
+    },
+    "freezing": {
+      "meanHealth": {
+        "delta": -4.846,
+        "ci95": [
+          -5.582,
+          -4.109
+        ]
+      },
+      "alive": {
+        "delta": -0.013,
+        "ci95": [
+          -0.037,
+          0.012
+        ]
+      },
+      "give": {
+        "delta": 3.725,
+        "ci95": [
+          2.231,
+          5.219
+        ]
+      },
+      "falseAccusations": {
+        "delta": -0.287,
+        "ci95": [
+          -0.459,
+          -0.116
+        ]
+      },
+      "meanNeeds.thirst": {
+        "delta": 4.026,
+        "ci95": [
+          2.698,
+          5.353
+        ]
+      },
+      "meanNeeds.cold": {
+        "delta": 12.616,
+        "ci95": [
+          11.19,
+          14.043
+        ]
+      }
+    },
+    "isolated": {
+      "meanHealth": {
+        "delta": 0.629,
+        "ci95": [
+          0.203,
+          1.055
+        ]
+      },
+      "alive": {
+        "delta": 0,
+        "ci95": [
+          0,
+          0
+        ]
+      },
+      "give": {
+        "delta": 1.313,
+        "ci95": [
+          0.358,
+          2.267
+        ]
+      },
+      "falseAccusations": {
+        "delta": -1,
+        "ci95": [
+          -1.234,
+          -0.766
+        ]
+      },
+      "meanNeeds.thirst": {
+        "delta": -2.581,
+        "ci95": [
+          -3.578,
+          -1.584
+        ]
+      },
+      "meanNeeds.cold": {
+        "delta": -2.401,
+        "ci95": [
+          -3.292,
+          -1.51
+        ]
+      }
+    }
+  }
+}
