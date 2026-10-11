@@ -58,3 +58,21 @@ test('deliberation only requires actor and explicit perception', () => {
 test('rng returns finite values on unit interval', () => {
   const random = rng(0); for(let i=0;i<1000;i++) assert.ok(random() >= 0);
 });
+
+test('same witnessed root cannot be re-counted as independent evidence', () => {
+  const world = run({ seed: 42, agents: 24, witnessRate: 1 }, 2000);
+  for (const actor of world.people) {
+    const roots = new Set();
+    for (const evidence of actor.memories) {
+      const key = `${evidence.rootId}:${evidence.kind}:${evidence.subject}`;
+      assert.ok(!roots.has(key), `duplicate source ${key}`);
+      roots.add(key);
+    }
+  }
+});
+test('a root report is forwarded to each recipient at most once', () => {
+  const world = run({ seed: 17, agents: 24, witnessRate: 1 }, 2000);
+  for (const actor of world.people) {
+    assert.equal(new Set(actor.reported).size, actor.reported.length);
+  }
+});
