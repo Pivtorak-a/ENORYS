@@ -58,3 +58,39 @@ test('deliberation only requires actor and explicit perception', () => {
 test('rng returns finite values on unit interval', () => {
   const random = rng(0); for(let i=0;i<1000;i++) assert.ok(random() >= 0);
 });
+
+test('same witnessed root cannot be re-counted as independent evidence', () => {
+  const world = run({ seed: 42, agents: 24, witnessRate: 1 }, 2000);
+  for (const actor of world.people) {
+    const roots = new Set();
+    for (const evidence of actor.memories) {
+      const key = `${evidence.rootId}:${evidence.kind}:${evidence.subject}`;
+      assert.ok(!roots.has(key), `duplicate source ${key}`);
+      roots.add(key);
+    }
+  }
+});
+test('a root report is forwarded to each recipient at most once', () => {
+  const world = run({ seed: 17, agents: 24, witnessRate: 1 }, 2000);
+  for (const actor of world.people) {
+    assert.equal(new Set(actor.reported).size, actor.reported.length);
+  }
+});
+
+test('unseen global audit events do not change an agent decision', () => {
+  const a = createWorld({ seed: 42, agents: 24 });
+  const b = createWorld({ seed: 42, agents: 24 });
+  b.log.push({ id: 'PRIVATE-UNSEEN', actor: 'X', kind: 'take', tick: -1 });
+  step(a); step(b);
+  assert.deepEqual(a.decisions, b.decisions);
+  assert.deepEqual(a.people, b.people);
+});
+test('decide is pure: action proposal does not alter resources or memory', () => {
+  const world = createWorld({ seed: 41, agents: 24 });
+  const actor = world.people[0];
+  const before = structuredClone(actor);
+  const cache = world.cache;
+  decide(actor, { cache, neighbors: [] });
+  assert.deepEqual(actor, before);
+  assert.equal(world.cache, cache);
+});

@@ -23,7 +23,7 @@ export function createWorld({ seed = 42, agents = 24, witnessRate = 0.5 } = {}) 
     place: i % 3,
     supplies: Math.floor(random() * 7),
     traits: { greed: random(), generosity: random(), norm: random(), sociability: random() },
-    memories: [], relationships: {}, reported: [],
+    memories: [], relationships: {}, reported: [], evidenceRoots: {},
   }));
   const cache = agents;
   return {
@@ -35,6 +35,9 @@ export function createWorld({ seed = 42, agents = 24, witnessRate = 0.5 } = {}) 
 
 function observed(actor, subject, event, source, confidence, parentId = null, rootId = event.id) {
   if (actor.id === subject || actor.memories.some(m => m.eventId === event.id && m.source === source)) return;
+  const rootKey = `${rootId}:${event.kind}:${subject}`;
+  if (actor.evidenceRoots[rootKey]) return; // a forwarded rumor is not fresh evidence
+  actor.evidenceRoots[rootKey] = true;
   const memory = { eventId: event.id, kind: event.kind, subject, source, confidence, parentId, rootId, tick: event.tick };
   actor.memories.push(memory);
   if (actor.memories.length > 60) actor.memories.shift();
@@ -48,9 +51,9 @@ export function decide(actor, perception) {
   const need = clamp((3 - actor.supplies) / 3);
   const surplus = clamp((actor.supplies - 3) / 3);
   const evidence = actor.memories.find(m => m.kind === 'take' && m.subject !== actor.id &&
-    perception.neighbors.some(n => n.id !== m.subject && !actor.reported.includes(`${m.eventId}:${n.id}`)));
+    perception.neighbors.some(n => n.id !== m.subject && !actor.reported.includes(`${m.rootId}:${n.id}`)));
   const recipient = evidence && perception.neighbors.find(n => n.id !== evidence.subject &&
-    !actor.reported.includes(`${evidence.eventId}:${n.id}`));
+    !actor.reported.includes(`${evidence.rootId}:${n.id}`));
   const candidates = [
     { action: 'wait', terms: { baseline: 0.75 } },
     ...(perception.cache > 0 ? [{ action: 'take', terms: {
@@ -81,8 +84,8 @@ function apply(world, actor, decision) {
     actor.supplies--; world.cache++; world.stats.donations++;
   } else if (action === 'tell') {
     if (!evidence || !recipient || !actor.memories.includes(evidence)) throw new Error('world adapter rejected unsupported report');
-    if (actor.reported.includes(`${evidence.eventId}:${recipient}`)) throw new Error('duplicate report');
-    actor.reported.push(`${evidence.eventId}:${recipient}`);
+    if (actor.reported.includes(`${evidence.rootId}:${recipient}`)) throw new Error('duplicate report');
+    actor.reported.push(`${evidence.rootId}:${recipient}`);
     event.recipient = recipient;
     event.claim = { kind: evidence.kind, subject: evidence.subject, parentId: evidence.eventId, rootId: evidence.rootId };
     world.stats.reports++;
