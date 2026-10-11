@@ -2,7 +2,7 @@
 
 **Experimental cognitive architecture for autonomous agents.** A small but runnable browser sandbox illustrating how partial observations, remembered events, social reports and explainable utility-based decisions can produce different histories from the same initial agents.
 
-> **Status: interactive demo / early research.** This is **not** the full NOEMYN v0.1.1 specification, a C# SDK, or a validated model of psychology. The planned C# CPU-first implementation remains future work.
+> **Status: interactive demo + early .NET 10 core primitives.** This is **not** the full NOEMYN v0.1.1 specification, a complete C# SDK, or a validated model of psychology. [Architecture decision and validation gates](docs/ADR-0001-ARCHITECTURE.md).
 
 ## Try the demo
 
@@ -30,15 +30,27 @@ npm test
 - Run a **counterfactual comparison** with the same seed and agents but 0% vs 100% witness chance.
 - File issues with your seed, agent count, witness chance and steps so others can reproduce behavior.
 
+## Headless C# core: mathematical validation
+
+The repository also includes **separate experimental .NET 10 primitives** (Noisy-OR, evidence-root de-duplication, stable softmax, keyed RNG), compiled and exercised by CI. They are not integrated into a full autonomous agent runtime yet.
+
+```bash
+dotnet run --project tests/Enorys.Smoke/Enorys.Smoke.csproj --configuration Release
+```
+
+Review [ADR-0001](docs/ADR-0001-ARCHITECTURE.md) for boundaries, architectural tradeoffs, exact verification scope and planned milestone tests.
+
 ## What the prototype does NOT do
 
 No natural language generation, LLM integration, lying, planner, persistence, learning, Godot adapter, validated emotions, or high-fidelity cognition. Rules and trait weights are **toy experimental defaults**, not psychologically calibrated. An audit log is available to the UI but never passed into an agent's decision function.
 
 ## Architecture
 
-- `src/engine.js`: seeded RNG, isolated agent observations, memory, relationships, decisions, authoritative world adapter, deterministic event log.
+- `src/engine.js`: browser-only simulation with seeded RNG, explicit local perceptions, memory, relationships, decisions and world authority.
+- `src/Enorys.Core/`: experimental **C#/.NET 10** mathematical components, separate from the JS demo.
 - `web/app.js`, `web/style.css`, `index.html`: dependency-free interactive UI.
-- `tests/engine.test.js`: determinism, provenance, utility transparency, conservation of resources, validation.
+- `tests/engine.test.js`: JS determinism, root provenance, utility transparency, conservation of resources, validation.
+- `tests/Enorys.Smoke/`: standalone .NET 10 numeric and deterministic invariant runner.
 - `docs/ARCHITECTURE.md`: boundaries, assumptions and known limitations.
 
 ## Development and contribution
