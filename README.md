@@ -2,7 +2,7 @@
 
 **Experimental cognitive architecture for autonomous agents.** A small but runnable browser sandbox illustrating how partial observations, remembered events, social reports and explainable utility-based decisions can produce different histories from the same initial agents.
 
-> **Status: interactive demo + early .NET 10 core primitives.** This is **not** the full NOEMYN v0.1.1 specification, a complete C# SDK, or a validated model of psychology. [Architecture decision and validation gates](docs/ADR-0001-ARCHITECTURE.md).
+> **Status: interactive demo + experimental .NET 10 primitives.** This is **not** the full NOEMYN v0.1.1 specification, a complete C# SDK, or a validated model of psychology. [Architecture decision and tests](docs/ADR-0001-ARCHITECTURE.md).
 
 ## Try the demo
 
@@ -32,13 +32,13 @@ npm test
 
 ## Headless C# core: mathematical validation
 
-The repository also includes **separate experimental .NET 10 primitives** (Noisy-OR, evidence-root de-duplication, stable softmax, keyed RNG), compiled and exercised by CI. They are not integrated into a full autonomous agent runtime yet.
+The repository includes **separate experimental .NET 10 primitives** (Noisy-OR, evidence-root de-duplication, stable softmax and keyed RNG), compiled and exercised in GitHub Actions. They are **not yet a complete autonomous-agent runtime**.
 
 ```bash
 dotnet run --project tests/Enorys.Smoke/Enorys.Smoke.csproj --configuration Release
 ```
 
-Review [ADR-0001](docs/ADR-0001-ARCHITECTURE.md) for boundaries, architectural tradeoffs, exact verification scope and planned milestone tests.
+See [ADR-0001](docs/ADR-0001-ARCHITECTURE.md) for the selected architecture, alternatives, known limitations and release gates.
 
 ## What the prototype does NOT do
 
@@ -46,12 +46,13 @@ No natural language generation, LLM integration, lying, planner, persistence, le
 
 ## Architecture
 
-- `src/engine.js`: browser-only simulation with seeded RNG, explicit local perceptions, memory, relationships, decisions and world authority.
-- `src/Enorys.Core/`: experimental **C#/.NET 10** mathematical components, separate from the JS demo.
+- `src/engine.js`: independent browser simulation of agents, observation, memories, rumors and world authority.
+- `src/Enorys.Core/`: experimental .NET 10 mathematical primitives, separate from the JavaScript demo.
 - `web/app.js`, `web/style.css`, `index.html`: dependency-free interactive UI.
-- `tests/engine.test.js`: JS determinism, root provenance, utility transparency, conservation of resources, validation.
-- `tests/Enorys.Smoke/`: standalone .NET 10 numeric and deterministic invariant runner.
-- `docs/ARCHITECTURE.md`: boundaries, assumptions and known limitations.
+- `tests/engine.test.js`: JavaScript determinism, provenance, utility, resource conservation and isolation.
+- `tests/Enorys.Smoke/`: runnable .NET 10 numerical and deterministic invariant suite.
+- `docs/ARCHITECTURE.md`: browser demo boundaries and known limitations.
+- `docs/ADR-0001-ARCHITECTURE.md`: headless core architectural decision, alternatives and verification gates.
 
 ## Development and contribution
 
