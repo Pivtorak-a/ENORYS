@@ -55,6 +55,18 @@ npm test
 
 Full results: [Experiment 001 — Expected vs observed](docs/EXPERIMENT-001.md).
 
+## Survival Lab (Experiment 003)
+
+The [Survival Lab](./survival.html) simulates **24 autonomous NPCs, nine changing survival needs and 14 item/object types**. It includes clean/dirty water, cooking, firewood, shelter, sanitation, medicine, injuries, resource scarcity, personal inventories, requests for help, accusations, and an interactive decision inspector.
+
+```bash
+node scripts/experiment-003.mjs 42 12
+node scripts/experiment-003-study.mjs > docs/experiment-003-results.json
+npm test
+```
+
+Read the [experimental results](docs/EXPERIMENT-003.md) and [architecture roadmap](docs/ARCHITECTURE-ROADMAP.md). This is a **separate exploratory JavaScript survival simulator**, not yet integrated into the headless .NET core.
+
 ## Headless C# core: mathematical validation
 
 The repository includes **separate experimental .NET 10 primitives** (Noisy-OR, evidence-root de-duplication, stable softmax and keyed RNG), compiled and exercised in GitHub Actions. They are **not yet a complete autonomous-agent runtime**.
