@@ -1,0 +1,17 @@
+.controls-evolution{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;margin:15px 0}
+.controls-evolution label{min-width:0}.controls-evolution output{color:#55d3c9}
+.switches{grid-column:span 3;display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.switches label{flex-direction:row;align-items:center;white-space:nowrap;cursor:pointer}
+.switches input{min-width:0;accent-color:#5bd6c8}.evo-actions{grid-column:span 2;display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+.metrics-evolution{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:12px 0 18px}
+.evo-layout{display:grid;grid-template-columns:1fr 1fr;gap:14px}.evo-layout .wide{grid-column:span 2}
+.run-status{font-size:12px;color:#a9c9ca;margin:11px 0}
+.need-line{display:grid;grid-template-columns:115px 1fr 43px;align-items:center;gap:8px;margin:12px 0;color:#adc1ce;font-size:12px}
+.need-track{height:9px;background:#293e4e;border-radius:9px;overflow:hidden}.need-fill{height:100%;border-radius:9px;background:#55cdbf}.need-fill.high{background:#e6a65a}
+.chronicle{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:485px;overflow-y:auto}.chronicle-entry{padding:11px;background:#0c1722;border:1px solid #253748;border-radius:8px;font-size:12px;line-height:1.45}
+.chronicle-entry strong{color:#6ee1d1}.chronicle-entry .sub{font-size:10px;color:#839eae;margin-top:4px}
+.evo-inspector{display:grid;grid-template-columns:1fr 1fr;gap:24px}.person-attributes{min-width:0}
+.evo-inspector h3{margin:10px 0;color:#b0e5e1;font-size:13px}.evo-inspector p{font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+#agent-picker{width:auto;min-width:125px}.comparison{display:block;margin-top:15px}.compare-row{font-size:12px;border-top:1px solid #253b4c;padding:11px 0;line-height:1.5}
+@media(max-width:920px){.controls-evolution{grid-template-columns:repeat(3,1fr)}.switches,.evo-actions{grid-column:span 3}.metrics-evolution{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.controls-evolution{grid-template-columns:1fr 1fr}.switches,.evo-actions{grid-column:span 2}.metrics-evolution{grid-template-columns:repeat(2,1fr)}.evo-layout{grid-template-columns:1fr}.evo-layout .wide{grid-column:auto}.chronicle,.evo-inspector{grid-template-columns:1fr}}

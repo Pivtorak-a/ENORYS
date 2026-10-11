@@ -1,0 +1,78 @@
+{
+  "platform": {
+    "node": "v22.16.0",
+    "arch": "x64",
+    "os": "linux",
+    "cpus": "not pinned",
+    "note": "microbenchmark in shared sandbox; NOT real-game FPS or .NET performance"
+  },
+  "repeats": 8,
+  "rows": [
+    {
+      "agents": 50,
+      "lod": false,
+      "days": 14,
+      "ticks": 2100,
+      "meanTotalMs": 25.385,
+      "meanP95TickMs": 0.0228,
+      "meanChecks": 16110.125,
+      "automatic": 0,
+      "health": 49.415
+    },
+    {
+      "agents": 50,
+      "lod": true,
+      "days": 14,
+      "ticks": 2100,
+      "meanTotalMs": 15.511,
+      "meanP95TickMs": 0.0125,
+      "meanChecks": 15577.875,
+      "automatic": 67.875,
+      "health": 49.415
+    },
+    {
+      "agents": 100,
+      "lod": false,
+      "days": 14,
+      "ticks": 4200,
+      "meanTotalMs": 33.398,
+      "meanP95TickMs": 0.0158,
+      "meanChecks": 33389.875,
+      "automatic": 0,
+      "health": 45.515
+    },
+    {
+      "agents": 100,
+      "lod": true,
+      "days": 14,
+      "ticks": 4200,
+      "meanTotalMs": 30.879,
+      "meanP95TickMs": 0.0147,
+      "meanChecks": 33130.25,
+      "automatic": 33,
+      "health": 45.515
+    },
+    {
+      "agents": 500,
+      "lod": false,
+      "days": 14,
+      "ticks": 21000,
+      "meanTotalMs": 390.466,
+      "meanP95TickMs": 0.0557,
+      "meanChecks": 168696.125,
+      "automatic": 0,
+      "health": 43.596
+    },
+    {
+      "agents": 500,
+      "lod": true,
+      "days": 14,
+      "ticks": 21000,
+      "meanTotalMs": 362.443,
+      "meanP95TickMs": 0.0544,
+      "meanChecks": 168693,
+      "automatic": 0.375,
+      "health": 43.596
+    }
+  ]
+}
