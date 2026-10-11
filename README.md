@@ -1,32 +1,53 @@
-# ENORYS
+# ENORYS · Cognitive Sandbox
 
-**ENORYS** is an experimental cognitive architecture for autonomous agents in simulations and games.
+**Experimental cognitive architecture for autonomous agents.** A small but runnable browser sandbox illustrating how partial observations, remembered events, social reports and explainable utility-based decisions can produce different histories from the same initial agents.
 
-The project explores agents that maintain memories, beliefs, relationships, motives and social norms, and select actions based on context and consequences rather than fixed behavior scripts.
+> **Status: interactive demo / early research.** This is **not** the full NOEMYN v0.1.1 specification, a C# SDK, or a validated model of psychology. The planned C# CPU-first implementation remains future work.
 
-## Planned architecture
+## Try the demo
 
-- **World observations:** structured facts and events, with partial knowledge and uncertainty.
-- **Memory and beliefs:** persistent facts, beliefs, and updates derived from observations.
-- **Relationships and norms:** agent-specific relations, obligations, and social expectations.
-- **Attention and salience:** prioritize what an agent notices and thinks about.
-- **Decision engine:** low-cost routine decisions, with deliberate reasoning for important cases.
-- **Cognitive level of detail:** adaptive computation budgets per agent.
-- **Decision Inspector:** explain and replay decisions for debugging.
+Open [`index.html`](./index.html) through a local HTTP server, or enable GitHub Pages in **Settings → Pages → Deploy from a branch → main → /(root)** to make it available in the browser. No external services, build tools, API keys or network requests are required at runtime.
 
-## Initial proof of concept
+```bash
+# In a checkout of this repository:
+python3 -m http.server 8000
+# Open http://localhost:8000
+```
 
-The first milestone targets a deterministic, testable simulation of **20–50 agents**, with most decisions handled by efficient non-LLM logic. LLM support, if added, should be optional and measured separately.
+Alternatively use Node.js 20+ to run the automated tests:
 
-## Status
+```bash
+npm ci
+npm test
+```
 
-**Planning / scaffold.** There is no runnable cognitive engine in this repository yet. Architecture and interfaces are subject to revision as the proof of concept is developed.
+### What you can do
 
-## Development workflow
+- Create **6–60 agents** with seeded individual traits, resources and zones.
+- Advance **one or 100 decisions** at a time; watch taking, giving, waiting and passing reports.
+- Inspect every candidate action's **utility components**.
+- Select an agent and inspect **eyewitness vs hearsay provenance** and changing relationships.
+- Run a **counterfactual comparison** with the same seed and agents but 0% vs 100% witness chance.
+- File issues with your seed, agent count, witness chance and steps so others can reproduce behavior.
 
-- `main`: reviewed, verified changes.
-- `develop`: active implementation and testing.
+## What the prototype does NOT do
+
+No natural language generation, LLM integration, lying, planner, persistence, learning, Godot adapter, validated emotions, or high-fidelity cognition. Rules and trait weights are **toy experimental defaults**, not psychologically calibrated. An audit log is available to the UI but never passed into an agent's decision function.
+
+## Architecture
+
+- `src/engine.js`: seeded RNG, isolated agent observations, memory, relationships, decisions, authoritative world adapter, deterministic event log.
+- `web/app.js`, `web/style.css`, `index.html`: dependency-free interactive UI.
+- `tests/engine.test.js`: determinism, provenance, utility transparency, conservation of resources, validation.
+- `docs/ARCHITECTURE.md`: boundaries, assumptions and known limitations.
+
+## Development and contribution
+
+- `main`: tested public version.
+- `develop`: integration branch.
+- [Open a bug report or feature request](https://github.com/Pivtorak-a/ENORYS/issues). Please include reproduction inputs.
+- If you'd like to contribute code, open an issue first to discuss scope.
 
 ## License
 
-No open-source license has been selected yet. Public visibility alone does **not** grant permission to reuse this code.
+**No license chosen yet.** Code is public for inspection; public visibility by itself does not confer broad rights to copy, modify or distribute it. Maintainer will choose a code license before calling the project open source.
