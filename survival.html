@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="ENORYS Survival Lab — симуляція базових потреб, предметів та автономних наслідків для NPC.">
+  <title>ENORYS — Survival Lab</title>
+  <link rel="stylesheet" href="./web/style.css"><link rel="stylesheet" href="./web/survival.css">
+  <script type="module" src="./web/survival.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="./"><span class="brand-mark">◈</span> ENORYS <span class="brand-sub">/ survival lab</span></a>
+  <div class="header-links"><a href="./story.html">Story Lab 002</a><a href="https://github.com/Pivtorak-a/ENORYS" target="_blank" rel="noopener noreferrer">GitHub ↗</a></div>
+</header>
+<main class="shell survival-shell">
+  <div class="intro"><p class="eyebrow">EXPERIMENT 003 · NEEDS, ITEMS & CONSEQUENCES</p>
+    <h1>Nothing happens<br><span>in isolation.</span></h1>
+    <p>Спрага змушує шукати воду. Дрова потрібні для кип’ятіння й тепла. Чужа допомога змінює довіру, а непевні свідчення можуть породжувати конфлікти. Кожне рішення можна перевірити.</p>
+  </div>
+  <form id="controls" class="panel survival-controls">
+    <label>Seed <input id="seed" type="number" min="0" max="4294967295" value="42" required></label>
+    <label>Днів <input id="days" type="number" min="1" max="40" value="12" required></label>
+    <label>Ресурси <span id="resources-value">100%</span><input id="resources" type="range" min="10" max="220" value="100"></label>
+    <label>Холод <span id="weather-value">60%</span><input id="weather" type="range" min="0" max="100" value="60"></label>
+    <label>Видимість <span id="visibility-value">30%</span><input id="visibility" type="range" min="0" max="100" value="30"></label>
+    <label class="check-label"><input id="gossip" type="checkbox" checked> Чутки</label>
+    <button type="submit">Запустити симуляцію</button>
+  </form>
+  <p class="error-message" id="error" role="alert" hidden></p>
+  <section class="metrics survival-metrics" aria-label="Показники експерименту">
+    <div class="panel metric"><span>Живих NPC</span><strong id="alive">–</strong></div>
+    <div class="panel metric"><span>Здоров’я, середнє</span><strong id="health">–</strong></div>
+    <div class="panel metric"><span>Різних дій</span><strong id="actions">–</strong></div>
+    <div class="panel metric"><span>Взаємодій: віддав</span><strong id="gifts">–</strong></div>
+    <div class="panel metric"><span>Помилкових звинувачень</span><strong id="wrong">–</strong></div>
+    <div class="panel metric"><span>Баланс предметів</span><strong id="balance">–</strong></div>
+  </section>
+  <div class="survival-layout">
+    <section class="panel needs-panel">
+      <div class="section-head"><h2>Дев’ять базових потреб населення</h2><span class="small">100 = максимальна нестача</span></div>
+      <div id="needs"></div><p class="hint">Здоров’я рахується окремо: 100 = повне здоров’я. Це експериментальні показники, а не медична модель.</p>
+    </section>
+    <section class="panel inventory-panel">
+      <div class="section-head"><h2>Інвентар і стан NPC</h2><select id="agent" aria-label="Вибрати NPC"></select></div>
+      <div id="agent-state"></div><h3>Предмети</h3><div id="inventory"></div>
+    </section>
+    <section class="panel chronology-panel">
+      <div class="section-head"><h2>Хронологія рішень</h2><select id="filter" aria-label="Фільтрувати події"><option value="story">Сюжетні події</option><option value="all">Усі дії</option><option value="survival">Виживання та здоров’я</option><option value="social">Соціальні взаємодії</option></select></div>
+      <p class="hint">Обери подію, щоб побачити її мотивацію. Імена та описи побудовані за фактичними записами симуляції.</p>
+      <div class="chronicle" id="chronicle"></div>
+    </section>
+    <section class="panel inspect-panel"><div class="section-head"><h2>Чому NPC так вирішив?</h2><span class="small">Decision Inspector</span></div>
+      <div id="inspector" class="inspector-content"><p class="empty">Вибери подію.</p></div>
+    </section>
+    <section class="panel alternative-panel"><div class="section-head"><h2>Інший розвиток історії</h2><span class="small">Той самий seed</span></div>
+      <p class="hint">Порівняння з удвічі меншим запасом ресурсів. Характер NPC не змінюється, але їхня поведінка та наслідки можуть змінитися.</p>
+      <button type="button" class="secondary" id="compare">Порівняти з дефіцитом</button><div id="comparison"></div>
+    </section>
+  </div>
+  <p class="footnote">ENORYS 003 — дослідний браузерний прототип. Не є повним C#-ядром або валідованою моделлю людської психології. <a href="https://github.com/Pivtorak-a/ENORYS/blob/main/docs/EXPERIMENT-003.md" target="_blank" rel="noopener noreferrer">Методика та обмеження ↗</a></p>
+</main>
+</body>
+</html>
