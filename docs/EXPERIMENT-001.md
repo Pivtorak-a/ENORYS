@@ -1,8 +1,8 @@
 # Experiment 001 — One event, many subjective beliefs
 
 **Date:** 2026-10-11  
-**Implementation:** \`scripts/experiment-001.mjs\` (JavaScript research harness; **not** the planned production C# runtime).  
-**Replication:** \`node scripts/experiment-001.mjs\` and \`npm test\` (Node 20+).  
+**Implementation:** `scripts/experiment-001.mjs` (JavaScript research harness; **not** the planned production C# runtime).  
+**Replication:** `node scripts/experiment-001.mjs` and `npm test` (Node 20+).  
 **Protocol:** 40 initialized NPC, one actor, one owner, **38 eligible observers**, fixed social ring, one ambiguous object transfer, seeded traits, fixed pseudo-random draws.
 
 ## Question
@@ -28,32 +28,32 @@ This is a mechanism test, not a demonstration of independent intelligence, human
 
 For 38 potential eyewitnesses and visibility probability p:
 
-\`\`\`text
+```text
 W ~ Binomial(38, p)
 E[W] = 38p
 SD(W) = sqrt(38p(1-p))
 SE(mean over 1000 seeds) = sqrt(38p(1-p)/1000)
-\`\`\`
+```
 
 At p=.35: E[W]=13.3; SD=2.9402; Monte Carlo mean expected within roughly **13.118–13.482** under a normal 95% approximation.
 
 Evidence updating:
 
-\`\`\`text
+```text
 P(no consent | evidence) = sigmoid(logit(.2) + sum(effective log-likelihood ratios))
 No new evidence -> 0.200000
 Single direct observation -> 0.714286
 Single hearsay source -> 0.325826
-\`\`\`
+```
 
 Utility terms (toy model, chosen for this research harness, not empirically calibrated):
 
-\`\`\`text
+```text
 V = 0.8 * posterior * NPC_norm
 U(ignore)      = 0.50
 U(investigate) = 1.3 * V + 0.4 * curiosity
 U(confront)    = 2.0 * V + 0.35 * courage - 0.10
-\`\`\`
+```
 
 Investigation/confrontation are unavailable **when no evidence exists**. Highest-utility action wins, with deterministic tie-breaking. There is no independent mathematical prediction of the exact number of confrontations without integrating over these generated traits and communication graph — those are **observed simulated outcomes**.
 
