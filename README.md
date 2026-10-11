@@ -30,6 +30,17 @@ npm test
 - Run a **counterfactual comparison** with the same seed and agents but 0% vs 100% witness chance.
 - File issues with your seed, agent count, witness chance and steps so others can reproduce behavior.
 
+## Reproducible NPC belief experiment
+
+A **40-agent, one-event counterfactual** compares analytical eyewitness expectations with 1,000 seeded simulations. It demonstrates differing subjective beliefs, decision utilities, rumor effects and a hidden-world-fact isolation test. It is a **JavaScript research harness**, not the full C# engine or validation of human psychology.
+
+```bash
+node scripts/experiment-001.mjs
+npm test
+```
+
+Full results: [Experiment 001 — Expected vs observed](docs/EXPERIMENT-001.md).
+
 ## Headless C# core: mathematical validation
 
 The repository includes **separate experimental .NET 10 primitives** (Noisy-OR, evidence-root de-duplication, stable softmax and keyed RNG), compiled and exercised in GitHub Actions. They are **not yet a complete autonomous-agent runtime**.
