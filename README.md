@@ -2,7 +2,7 @@
 
 **Experimental cognitive architecture for autonomous agents.** A small but runnable browser sandbox illustrating how partial observations, remembered events, social reports and explainable utility-based decisions can produce different histories from the same initial agents.
 
-> **Status: interactive demo + experimental .NET 10 primitives.** This is **not** the full NOEMYN v0.1.1 specification, a complete C# SDK, or a validated model of psychology. [Architecture decision and tests](docs/ADR-0001-ARCHITECTURE.md).
+> **Status: interactive demo / early research.** This is **not** the full NOEMYN v0.1.1 specification, a C# SDK, or a validated model of psychology. The planned C# CPU-first implementation remains future work.
 
 ## Try the demo
 
@@ -30,52 +30,21 @@ npm test
 - Run a **counterfactual comparison** with the same seed and agents but 0% vs 100% witness chance.
 - File issues with your seed, agent count, witness chance and steps so others can reproduce behavior.
 
-## Multi-agent Story Lab (Experiment 002)
+## Experiment 004 — Agent Evolution Lab (v0.4)
 
-**New:** [Open Story Lab](./story.html) to run a 24-agent settlement with resource scarcity, fallible eyewitness identification, rumors, investigations, public accusations, defense, restitution and guarding. Change the seed, visibility, gossip and perception errors to generate different **12-day histories**. Select an incident and click any event to inspect the agent's private evidence and decision utilities.
+Four sequentially tested reference architecture steps: **survival domain boundaries**, **multi-step goals and dynamic reservations**, **private evidence / social obligations**, and **conservative Cognitive LOD**. This is runnable **JavaScript reference code**, not the finalized .NET kernel.
 
-This is a **reproducible JavaScript research prototype**, not a fully validated cognitive model or the headless .NET engine.
-
-```bash
-python3 -m http.server 8000  # open http://localhost:8000/story.html
-node scripts/experiment-002.mjs 42 12
-npm test
-```
-
-[Experiment 002: measured behavior and limitations](docs/EXPERIMENT-002.md).
-
-## Reproducible NPC belief experiment
-
-A **40-agent, one-event counterfactual** compares analytical eyewitness expectations with 1,000 seeded simulations. It demonstrates differing subjective beliefs, decision utilities, rumor effects and a hidden-world-fact isolation test. It is a **JavaScript research harness**, not the full C# engine or validation of human psychology.
+- [Interactive Agent Evolution Lab](evolution.html) — compare same-seed scenarios, inspect NPC memories and event histories.
+- [Methodology, expectations vs outcomes](docs/EXPERIMENT-004.md) — 40 paired seeds, 100 fuzz seeds, 100 LOD audit seeds, 50/100/500-NPC indicative benchmarks.
+- [Architecture and next release gates](docs/ARCHITECTURE-V04.md).
 
 ```bash
-node scripts/experiment-001.mjs
-npm test
+node --test tests/v04-*.test.js
+node scripts/experiment-004.mjs
+python3 -m http.server 8000   # open http://localhost:8000/evolution.html
 ```
 
-Full results: [Experiment 001 — Expected vs observed](docs/EXPERIMENT-001.md).
-
-## Survival Lab (Experiment 003)
-
-The [Survival Lab](./survival.html) simulates **24 autonomous NPCs, nine changing survival needs and 14 item/object types**. It includes clean/dirty water, cooking, firewood, shelter, sanitation, medicine, injuries, resource scarcity, personal inventories, requests for help, accusations, and an interactive decision inspector.
-
-```bash
-node scripts/experiment-003.mjs 42 12
-node scripts/experiment-003-study.mjs > docs/experiment-003-results.json
-npm test
-```
-
-Read the [experimental results](docs/EXPERIMENT-003.md) and [architecture roadmap](docs/ARCHITECTURE-ROADMAP.md). This is a **separate exploratory JavaScript survival simulator**, not yet integrated into the headless .NET core.
-
-## Headless C# core: mathematical validation
-
-The repository includes **separate experimental .NET 10 primitives** (Noisy-OR, evidence-root de-duplication, stable softmax and keyed RNG), compiled and exercised in GitHub Actions. They are **not yet a complete autonomous-agent runtime**.
-
-```bash
-dotnet run --project tests/Enorys.Smoke/Enorys.Smoke.csproj --configuration Release
-```
-
-See [ADR-0001](docs/ADR-0001-ARCHITECTURE.md) for the selected architecture, alternatives, known limitations and release gates.
+**Limitations:** old v0.3 files remain reproducible and unchanged. In v0.4, 500-agent LOD speedups are **not** yet substantiated; the .NET/Godot integration remains outstanding.
 
 ## What the prototype does NOT do
 
@@ -83,13 +52,10 @@ No natural language generation, LLM integration, lying, planner, persistence, le
 
 ## Architecture
 
-- `src/engine.js`: independent browser simulation of agents, observation, memories, rumors and world authority.
-- `src/Enorys.Core/`: experimental .NET 10 mathematical primitives, separate from the JavaScript demo.
+- `src/engine.js`: seeded RNG, isolated agent observations, memory, relationships, decisions, authoritative world adapter, deterministic event log.
 - `web/app.js`, `web/style.css`, `index.html`: dependency-free interactive UI.
-- `tests/engine.test.js`: JavaScript determinism, provenance, utility, resource conservation and isolation.
-- `tests/Enorys.Smoke/`: runnable .NET 10 numerical and deterministic invariant suite.
-- `docs/ARCHITECTURE.md`: browser demo boundaries and known limitations.
-- `docs/ADR-0001-ARCHITECTURE.md`: headless core architectural decision, alternatives and verification gates.
+- `tests/engine.test.js`: determinism, provenance, utility transparency, conservation of resources, validation.
+- `docs/ARCHITECTURE.md`: boundaries, assumptions and known limitations.
 
 ## Development and contribution
 
