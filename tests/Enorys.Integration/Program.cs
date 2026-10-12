@@ -176,6 +176,11 @@ static class Program {
             Check(double.IsFinite(acm.ActionBias(mindView,"survival:accuse","A003",11))&&
                   Math.Abs(acm.ActionBias(mindView,"survival:accuse","A003",11))<=.6,
                 "mixed affect contributes bounded finite utility (fear may outweigh anger)");
+
+            var customAffect=new AffectiveMap(Path.Combine(root,"data-packs/affect-custom.json"));
+            customAffect.Receive(mindView,corrected);
+            Check(customAffect.Inspect(mindView.Id,11).Any(x=>x.EmotionId=="customaffect:relief"),
+                "custom emotion and event trigger loaded from JSON, no code edits");
             Check(acm.Inspect(mindView.Id,60).All(x=>x.Intensity<=
                 afterCorrection.First(y=>y.EmotionId==x.EmotionId&&y.TargetId==x.TargetId&&y.EvidenceRoot==x.EvidenceRoot).Intensity),
                 "lazy emotional decay monotone without new evidence");
