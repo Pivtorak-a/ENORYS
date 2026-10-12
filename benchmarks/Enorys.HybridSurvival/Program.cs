@@ -40,6 +40,7 @@ internal static class Program {
             fastForwardCalls=Outcome.FastForwardCalls,
             interruptedWakes=Outcome.WakeInterruptions,
             wakeHeapHighWater=Outcome.CalendarHighWater,
+            cognitiveWakeVetoes=Outcome.CognitiveWakeVetoes,
             messagesProcessed=Outcome.MessagesProcessed,
             memoryEvidenceMessages=Outcome.MemoryEvidenceProcessed,
             affectMessageVisits=Outcome.AffectMessagesProcessed,
@@ -94,13 +95,13 @@ internal static class Program {
                 HybridActiveAgents:test.Sparse?test.Active:0,
                 BackgroundMaximumRounds:test.MaximumRounds,
                 BackgroundRoundsPerDay:3,
-                CaptureHistory:test.Trace)).Run();
+                CaptureHistory:test.Trace,NormalizeCognitiveClock:true)).Run();
         sw.Stop();
         var allocationMiB=(GC.GetTotalAllocatedBytes(true)-allocated)/1048576.0;
         int activeEmotion=0,backgroundEmotion=0;
         if(affect!=null){
             foreach(int i in new[]{0,Math.Min(test.Active-1,test.Agents-1)})
-                activeEmotion+=affect.Inspect(world.GetPrivateAgent(i).Id,world.Tick).Count;
+                activeEmotion+=affect.Inspect(world.GetPrivateAgent(i).Id,world.Tick/test.Agents).Count;
             foreach(int i in new[]{receiver,receiver2})
                 if(i<test.Agents)
                     backgroundEmotion+=affect.Inspect(world.GetPrivateAgent(i).Id,world.Tick).Count;
@@ -182,8 +183,8 @@ internal static class Program {
             var warm=new Case(19,24,8,2,false,1,true,.1,.7,false);
             Run(root,domain,warm);Run(root,domain,warm with{Sparse=true});
             foreach((string label,double visibility,double resources,int days) scenario in new[]{
-                ("sparse-social",.025,.70,3),
-                ("denser-social",.18,.80,3)}){
+                ("sparse-social",.025,.70,7),
+                ("denser-social",.18,.80,7)}){
                 for(int seed=100;seed<103;seed++){
                     foreach(bool pulse in new[]{false,true}){
                         var result=Run(root,domain,new Case(seed,Active+Background,Active,
