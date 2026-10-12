@@ -66,6 +66,25 @@ This is **NOT a drop-in replacement for ENORYS Core**: the proof tests determini
 
 Read the [complete benchmark protocol, negative results, modularity and integration gates](docs/EXPERIMENT-008-PULSEGRAPH-BENCHMARK.md). Run with `dotnet run --project experiments/Enorys.PulseGraph -c Release -- test` and `-- bench`.
 
+## Hybrid cognition in the actual SurvivalWorld (experiment 009)
+
+Beyond the standalone PulseGraph test, the **real C# ENORYS SurvivalWorld and Engine** now support an **opt-in** 500 active + 5,000 background-NPC mode. It uses `PulseWheelCalendar` or `PulseCalendar` (heap), real world-side inventory and day progression, private observation/inbox wakeups, plan/memory/epistemics updates, optional ACM, and registered module-defined wake signals.
+
+**Important results:** seven-day world, 115,500 nominal actor slots, .NET 10 Linux CI:
+
+- Low-social: full decisions **738 ms**, aggressive wheel **738 ms** (similar), conservative wheel **877 ms**. Aggressive background skipping saved ~28% managed allocations but reduced mean health from **91.48 → 83.72**; conservative preserved health (~91.07) but was slower.
+- Higher-social: full decisions **1,088 ms**, aggressive wheel **1,160 ms**, conservative wheel **1,227 ms**. Again, the approximate event-driven policy did **not** improve whole-world speed.
+- Material conservation and determinism tested; disabled skipping exactly reproduces the original reference trace on matched small-world tests. Significant private emotional states can prevent further sleep.
+
+Therefore **the default engine remains unchanged**. The optional scheduling layer is a research tool for measuring actor activity and building an eventual action-preserving event graph, not a proven 5,500-agent speedup. It still has quality/performance tradeoffs to solve.
+
+Read [Experiment 009 — complete benchmark, health and allocation comparisons](docs/EXPERIMENT-009-HYBRID-SURVIVAL.md) and [ADR-0005](docs/ADR-0005-HYBRID-SURVIVAL.md). Try it:
+
+```bash
+dotnet run --project benchmarks/Enorys.HybridSurvival -c Release -- test
+dotnet run --project benchmarks/Enorys.HybridSurvival -c Release -- bench
+```
+
 ## Legacy research demos (JavaScript)
 
 

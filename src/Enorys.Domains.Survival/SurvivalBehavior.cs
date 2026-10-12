@@ -84,7 +84,7 @@ public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDeci
                 !a.Reported.Contains("retract:"+x.Root+":"+x.Recipient));
             if(correction!=null)candidates.Add(C(a,"retract",3.2,"correct false report",
                 target:correction.Recipient,root:correction.Root));
-            var suspicion=FindSuspicion(a,p.Tick);
+            var suspicion=FindSuspicion(a,p.Tick,ctx.CognitiveTickStride);
             if(suspicion!=null&&suspicion.Value.Probability>.4){
                 var s=suspicion.Value;
                 if(!a.Acted.Contains("investigate:"+s.Incident))
@@ -121,12 +121,12 @@ public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDeci
         }
         return new Decision(selected.Proposal,"deliberate",selected.Reason,candidates.Count,best);
     }
-    private static (string Incident,string Suspect,double Probability,string Root,double LogLikelihood)? FindSuspicion(AgentView a,long tick){
+    private static (string Incident,string Suspect,double Probability,string Root,double LogLikelihood)? FindSuspicion(AgentView a,long tick,int stride){
         (string Incident,string Suspect,double Probability,string Root,double LogLikelihood)? result=null;
         foreach(var group in a.Evidence.Where(e=>e.Active&&e.Suspect!=a.Id).GroupBy(e=>e.Incident+":"+e.Suspect)){
             var list=group.OrderByDescending(x=>x.LogLikelihood).ThenBy(x=>x.Root,StringComparer.Ordinal).ToArray();
             double logit=Math.Log(.12/.88);
-            for(int j=0;j<list.Length;j++)logit+=list[j].LogLikelihood*Math.Exp(-Math.Max(0,tick-list[j].Tick)/800.0)*(j==0?1:.25);
+            for(int j=0;j<list.Length;j++)logit+=list[j].LogLikelihood*Math.Exp(-Math.Max(0,tick-list[j].Tick)/(800.0*stride))*(j==0?1:.25);
             double posterior=1/(1+Math.Exp(-logit));
             if(result==null||posterior>result.Value.Probability)
                 result=(list[0].Incident,list[0].Suspect,posterior,list[0].Root,list[0].LogLikelihood);
