@@ -7,10 +7,10 @@ using Enorys.Core.Planning;
 using Enorys.Core.Social;
 namespace Enorys.Core.Runtime;
 
-public sealed record EngineOptions(bool Planning=true,bool Social=true,bool CognitiveLod=true,bool AuditLod=false);
+public sealed record EngineOptions(bool Planning=true,bool Social=true,bool CognitiveLod=true,bool AuditLod=false,bool EventScheduling=false);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
-    string TraceHash,IReadOnlyList<string> History);
+    string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}}
 /// <summary>Core owns cognition, World Adapter owns truth and material state.</summary>
 public sealed class Engine {
     private readonly IWorldAdapter world;
@@ -18,6 +18,8 @@ public sealed class Engine {
     private readonly Planner planner;
     private readonly IDecisionModule decision;
     private readonly EngineOptions options;
+    private readonly WakeScheduler? scheduler;
+    private readonly IWakePolicy? wakePolicy;
     private long automatic,deliberate,candidateChecks,decisionTicks;
     private int plansCompleted,plansAbandoned,divergences;
     private readonly List<string> history=new();
@@ -49,6 +51,8 @@ public sealed class Engine {
         planner=new Planner(domain);
         decision=host.Decisions.FirstOrDefault()??throw new InvalidOperationException("No decision module installed");
         minds=Enumerable.Range(0,world.AgentCount).Select(_=>new AgentMind()).ToArray();
+        wakePolicy=host.WakePolicies.FirstOrDefault();
+        if(options.EventScheduling && wakePolicy!=null)scheduler=new WakeScheduler(world.AgentCount);
     }
     private AgentView PrivateSnapshot(AgentView baseView,ObservationPacket packet,AgentMind mind) {
         var evidence=mind.Evidence.Values.ToArray();
@@ -71,6 +75,13 @@ public sealed class Engine {
             if(!world.IsAlive(index)){
                 history.Add($"{world.Tick}|inactive");
                 world.Advance();continue;
+            }
+            if(scheduler!=null){
+                bool pending=world is IObservationSignal signal && signal.HasPendingObservation(index);
+                if(!scheduler.ShouldRun(index,world.Tick,pending)){
+                    history.Add($"{world.Tick}|deferred");
+                    world.Advance();continue;
+                }
             }
             var mind=minds[index];
             var obs=world.Observe(index);
@@ -104,6 +115,10 @@ public sealed class Engine {
                 }
             }else if(mind.Plan!=null){mind.Plan=null;plansAbandoned++;}
             history.Add($"{obs.Tick}|{actor.Id}|{choice.Proposal.Kind}|{choice.Proposal.Item}|{choice.Proposal.Target}|{result.Accepted}");
+            if(scheduler!=null && wakePolicy!=null){
+                int sleepTurns=wakePolicy.SleepTurns(actor,obs,choice,result);
+                scheduler.Schedule(index,world.Tick,sleepTurns);
+            }
             world.Advance();
         }
 
@@ -111,6 +126,9 @@ public sealed class Engine {
         var wm=world.GetMetrics() with {CandidateChecks=candidateChecks,
             AutoDecisions=automatic,Deliberations=deliberate,PlansCompleted=plansCompleted};
         return new EngineResults(wm,automatic,deliberate,candidateChecks,plansCompleted,plansAbandoned,
-            divergences,decisionTicks,Convert.ToHexString(bytes),history);
+            divergences,decisionTicks,Convert.ToHexString(bytes),history){
+                SkippedDecisions=scheduler?.Skipped??0,
+                WakeInterruptions=scheduler?.Interrupted??0
+            };
     }
 }
