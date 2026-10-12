@@ -46,6 +46,12 @@ python3 -m http.server 8000   # open http://localhost:8000/evolution.html
 
 **Limitations:** old v0.3 files remain reproducible and unchanged. In v0.4, 500-agent LOD speedups are **not** yet substantiated; the .NET/Godot integration remains outstanding.
 
+## Modular extensibility — proposed production contract
+
+ENORYS is designed to remain **game-agnostic**. Users should be able to add their own needs, items, emotions, norms and actions as validated namespaced **Data Packs**, add decision/appraisal/psychology algorithms as versioned **Behavior Modules**, and connect Godot or other simulations through independent **World Adapters**, without editing or rebuilding the Core. The Affective Cognitive Map is replaceable, not mandatory.
+
+Read [ADR-0003 — extensible modules and user-authored data](docs/ADR-0003-EXTENSIBLE-MODULES.md) and [ADR-0002 — Affective Cognitive Map](docs/ADR-0002-AFFECTIVE-COGNITIVE-MAP.md). **Status: proposed architecture**. The plugin loader, data schemas and public module SDK are **not implemented yet**. Their acceptance tests are specified in ADR-0003.
+
 ## What the prototype does NOT do
 
 No natural language generation, LLM integration, lying, planner, persistence, learning, Godot adapter, validated emotions, or high-fidelity cognition. Rules and trait weights are **toy experimental defaults**, not psychologically calibrated. An audit log is available to the UI but never passed into an agent's decision function.
