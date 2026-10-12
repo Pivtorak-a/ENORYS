@@ -71,3 +71,16 @@ internal sealed class TimedWorld(IWorldAdapter inner) : IWorldAdapter,IObservati
         inner is IObservationSignal signal && signal.HasPendingObservation(index);
     public WorldMetrics GetMetrics()=>inner.GetMetrics();
 }
+
+internal sealed class TimedChoice(IChoiceKernel inner) : IChoiceKernel {
+    public string Name=>"Timed "+inner.Name;
+    public long Ticks {get;private set;}
+    public long Calls {get;private set;}
+    public int ArgMax(ReadOnlySpan<double> values){
+        long start=Stopwatch.GetTimestamp();
+        int index=inner.ArgMax(values);
+        Ticks+=Stopwatch.GetTimestamp()-start;
+        Calls++;
+        return index;
+    }
+}
