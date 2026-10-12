@@ -4,7 +4,7 @@ namespace Enorys.Affect.ACM;
 
 /// <summary>Experimental subjective graph: source-root -> target -> emotion. Not a validated psychology model.</summary>
 public sealed record EmotionDefinition(string Id,double Decay,double Impulse,
-    Dictionary<string,double> ActionBias);
+    Dictionary<string,double> ActionBias,string[]? Triggers=null,string Target="from");
 public sealed record EmotionCatalog(string Namespace,string Version,List<EmotionDefinition> Emotions);
 internal sealed record Episode(string Kind,string Target,string Root,double Initial,long Tick);
 
@@ -25,7 +25,8 @@ public sealed class AffectiveMap : IEnorysModule, IAffectiveModule {
             var id=emotion.Id.Contains(':')?emotion.Id:catalog.Namespace+":"+emotion.Id;
             if(emotion.Decay<0||emotion.Decay>2||!double.IsFinite(emotion.Decay)||
                 emotion.Impulse<0||emotion.Impulse>1||!double.IsFinite(emotion.Impulse)||
-                emotion.ActionBias.Any(x=>!double.IsFinite(x.Value))||
+                emotion.ActionBias==null||emotion.ActionBias.Any(x=>!double.IsFinite(x.Value))||
+                (emotion.Target!="from"&&emotion.Target!="suspect")||
                 !definitions.TryAdd(id,emotion with {Id=id}))
                 throw new InvalidDataException("Invalid or duplicate emotion "+id);
         }
@@ -67,6 +68,16 @@ public sealed class AffectiveMap : IEnorysModule, IAffectiveModule {
                         }
                     }
                     break;
+            }
+            // Content-defined emotional reactions: new emotions and event triggers
+            // require a JSON catalog edit, not a recompile of Core or this module.
+            foreach(var definition in definitions.Values){
+                if(definition.Triggers?.Contains(m.Type,StringComparer.Ordinal)!=true)continue;
+                string? subject=definition.Target=="suspect"?m.Suspect:m.From;
+                if(!string.IsNullOrEmpty(subject)){
+                    string id=definition.Id[(definition.Id.IndexOf(':')+1)..];
+                    Impulse(agent.Id,id,subject,root,observation.Tick,1);
+                }
             }
         }
     }
