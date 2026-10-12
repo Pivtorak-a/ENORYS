@@ -23,7 +23,7 @@ internal static class Program {
     }
     private sealed record Case(int Seed,int Agents,int Active,int Days,
         bool Sparse,int MaximumRounds,bool Affect,double Visibility,double Resources,
-        bool Trace=true,bool Wheel=true);
+        bool Trace=true,bool Wheel=true,bool Conservative=false);
     private sealed record Record(EngineResults Outcome,SurvivalWorld World,
         double Milliseconds,double AllocationMiB,double CurrentWorkingSetMiB,
         int ActiveEmotionEpisodes,int BackgroundEmotionEpisodes,
@@ -62,7 +62,7 @@ internal static class Program {
         var host=new ModuleHost();
         host.Install(new SurvivalBehavior());
         host.Install(new SurvivalBackgroundDeadline(domain,
-            Path.Combine(root,"data-packs/survival-pulse.json")));
+            Path.Combine(root,test.Conservative?"data-packs/survival-pulse-conservative.json":"data-packs/survival-pulse.json")));
         AffectiveMap? affect=null;
         if(test.Affect){
             affect=new AffectiveMap(Path.Combine(root,"data-packs/affect-basic.json"));
@@ -110,7 +110,7 @@ internal static class Program {
         return new Record(outcome,world,sw.Elapsed.TotalMilliseconds,allocationMiB,
             Process.GetCurrentProcess().WorkingSet64/1048576.0,
             activeEmotion,backgroundEmotion,
-            test.Sparse?(test.Wheel?"pulse-wheel":"pulse-heap"):"full",test.Seed);
+            test.Sparse?(test.Conservative?"pulse-wheel-conservative":test.Wheel?"pulse-wheel":"pulse-heap"):"full",test.Seed);
     }
     private static int Tests(string root,DomainRegistry domain){
         try{
@@ -165,6 +165,11 @@ internal static class Program {
             var heapVersion=Run(root,domain,new Case(42,24,8,6,true,9,true,.10,.8,Wheel:false));
             Check(hybrid.Outcome.TraceHash==heapVersion.Outcome.TraceHash,
                 "heap and timing-wheel produce same ordered actions with private wakeups");
+            var conservative=Run(root,domain,new Case(42,24,8,6,true,9,true,.10,.8,
+                Conservative:true));
+            Check(conservative.Outcome.World.ResourcesBalanced &&
+                  conservative.Outcome.BackgroundDecisions>0,
+                "conservative JSON background policy runs without modifying the Core");
             var repeat=Run(root,domain,new Case(42,24,8,6,true,9,true,.10,.8));
             Check(hybrid.Outcome.TraceHash==repeat.Outcome.TraceHash,
                 "hybrid pulse replay deterministic with emotion and memory");
@@ -188,14 +193,19 @@ internal static class Program {
             }));
             var warm=new Case(19,24,8,2,false,1,true,.1,.7,false);
             Run(root,domain,warm);Run(root,domain,warm with{Sparse=true});
+            // Large-world warmup of actor snapshots and the emotion module.
+            Run(root,domain,new Case(97,Active+Background,Active,1,false,1,true,.04,.7,false));
+            Run(root,domain,new Case(98,Active+Background,Active,1,true,9,true,.04,.7,false));
             foreach((string label,double visibility,double resources,int days) scenario in new[]{
                 ("sparse-social",.025,.70,7),
                 ("denser-social",.18,.80,7)}){
                 for(int seed=100;seed<103;seed++){
-                    foreach(int variant in new[]{0,1,2}){
+                    // Rotate test order to reduce JIT/GC/runner thermal bias.
+                    int[][] orders=[[0,1,2,3],[2,3,0,1],[1,0,3,2]];
+                    foreach(int variant in orders[seed-100]){
                         var result=Run(root,domain,new Case(seed,Active+Background,Active,
                             scenario.days,variant!=0,9,true,scenario.visibility,scenario.resources,
-                            Trace:false,Wheel:variant!=2));
+                            Trace:false,Wheel:variant!=2,Conservative:variant==3));
                         if(!result.Outcome.World.ResourcesBalanced ||
                            result.Outcome.World.Turns!=(Active+Background)*scenario.days*3)
                             throw new InvalidOperationException("World corrupt");
