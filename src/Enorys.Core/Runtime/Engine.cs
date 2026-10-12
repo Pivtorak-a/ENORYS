@@ -64,7 +64,7 @@ public sealed class Engine {
         };
     }
     public EngineResults Run(){
-        var start=System.Diagnostics.Stopwatch.GetTimestamp();
+        
         while(world.Tick<world.TotalTurns){
             int index=(int)(world.Tick%world.AgentCount);
             if(!world.IsAlive(index)){
@@ -102,7 +102,7 @@ public sealed class Engine {
                     if(p.Finished){mind.Plan=null;plansCompleted++;}
                 }
             }else if(mind.Plan!=null){mind.Plan=null;plansAbandoned++;}
-            history.Add($"{obs.Tick}|{actor.Id}|{choice.Mode}|{choice.Proposal.Kind}|{choice.Proposal.Item}|{choice.Proposal.Target}|{result.Accepted}");
+            history.Add($"{obs.Tick}|{actor.Id}|{choice.Proposal.Kind}|{choice.Proposal.Item}|{choice.Proposal.Target}|{result.Accepted}");
             world.Advance();
         }
 
