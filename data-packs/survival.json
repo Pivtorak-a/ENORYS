@@ -171,5 +171,19 @@
       "threshold": 48
     }
   ],
-  "actions": []
+  "actions": [],
+  "sources": [
+    {
+      "itemId": "dirty_water",
+      "actionId": "collect_water"
+    },
+    {
+      "itemId": "raw_food",
+      "actionId": "gather_food"
+    },
+    {
+      "itemId": "wood",
+      "actionId": "gather_wood"
+    }
+  ]
 }
