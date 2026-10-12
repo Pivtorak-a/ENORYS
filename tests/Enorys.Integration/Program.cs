@@ -6,6 +6,7 @@ using Enorys.Core.Modules;
 using Enorys.Core.Runtime;
 using Enorys.Domains.Survival;
 using Enorys.CustomBehavior;
+using Enorys.Core.Social;
 
 static class Program {
     static int Main(string[] args){
@@ -70,6 +71,21 @@ static class Program {
             Check(action.Accepted&&after.Inventory["survival:water"]==before.Inventory["survival:water"]-1
                 &&after.Needs["demo:focus"]<=before.Needs["demo:focus"],"custom effect executed without rebuilding Core");
             Check(extra.ResourcesBalanced,"custom action respects resource ledger");
+            var mind=new AgentMind();
+            var packet=new ObservationPacket(1,1,.4,
+                new Dictionary<string,int>(),new Dictionary<string,bool>(),[],
+                [new Message("evidence","A002",Incident:"E007",Root:"R07",Suspect:"A009",LogLikelihood:Math.Log(4),Source:"eyewitness",Tick:1),
+                 new Message("evidence","A008",Incident:"E007",Root:"R07",Suspect:"A009",LogLikelihood:Math.Log(4),Source:"hearsay",Tick:1)]);
+            mind.Ingest(packet);
+            Check(mind.Evidence.Count==1,"one eyewitness root forwarded twice remains one evidence");
+            mind.Ingest(packet with {Tick=2,Messages=[new Message("retract","A002",Root:"R07",Tick:2)]});
+            Check(!mind.Evidence["R07"].Active,"source-authorized retraction deactivates private belief");
+            var beforeInvalid=extra.GetPrivateAgent(0);
+            var invalidProposal=extra.Execute(new ActionProposal(beforeInvalid.Id,"survival:boil"));
+            var afterInvalid=extra.GetPrivateAgent(0);
+            Check(!invalidProposal.Accepted&&beforeInvalid.Inventory.SequenceEqual(afterInvalid.Inventory),
+                "rejected recipe must not mutate material state");
+
             var extraModuleHost=new ModuleHost();
             extraModuleHost.Install(new FocusBehavior());
             var pluginWorld=new SurvivalWorld(custom,new SurvivalConfig(22,24,3));
@@ -86,6 +102,14 @@ static class Program {
                 var r=Run(d,host,seed:12,agents:size,days:3,resource:.6);
                 Check(r.World.ResourcesBalanced&&r.World.Turns==size*3*3,"large group "+size);
             }
+
+            for(int seed=201;seed<=240;seed++){
+                var variant=Run(d,host,seed,agents:24,days:6,resource:.3+(seed%8)*.2,lod:true);
+                if(!variant.World.ResourcesBalanced||!double.IsFinite(variant.World.AverageHealth)||
+                   variant.World.AverageHealth is <0 or >100)
+                    throw new Exception("Stress invariant failed on seed "+seed);
+            }
+            Check(true,"40 varied scarcity and replay seeds");
             Console.WriteLine("RESULT integration tests PASSED");
             return 0;
         }catch(Exception e){Console.Error.WriteLine("RESULT integration tests FAILED: "+e);return 1;}
@@ -107,6 +131,7 @@ static class Program {
                 for(int k=0;k<repetitions;k++){
                     GC.Collect();GC.WaitForPendingFinalizers();GC.Collect();
                     long allocatedBefore=GC.GetTotalAllocatedBytes(true);
+                    int gc0Before=GC.CollectionCount(0),gc1Before=GC.CollectionCount(1),gc2Before=GC.CollectionCount(2);
                     var proc=Process.GetCurrentProcess();
                     var processorBefore=proc.TotalProcessorTime;
                     var sw=Stopwatch.StartNew();
@@ -118,6 +143,9 @@ static class Program {
                         throw new Exception("Benchmark invariant failed");
                     times.Add(sw.Elapsed.TotalMilliseconds);allocations.Add(alloc);cpu.Add(cpuMs);
                     measurements.Add(new {ms=sw.Elapsed.TotalMilliseconds,allocBytes=alloc,cpuMs,
+                        gc0=GC.CollectionCount(0)-gc0Before,
+                        gc1=GC.CollectionCount(1)-gc1Before,
+                        gc2=GC.CollectionCount(2)-gc2Before,
                         decisions=outcome.World.Turns,automatic=outcome.Automatic,health=outcome.World.AverageHealth,
                         candidateChecks=outcome.CandidateChecks});
                 }
@@ -127,6 +155,8 @@ static class Program {
                     minMs=ordered[0],maxMs=ordered[^1],meanCpuMs=cpu.Average(),
                     throughputTurnsPerSec=n*14*3/(median/1000),
                     allocatedBytesPerTurn=allocatedPerTurn,
+                    cpuMicrosecondsPerTurn=1000*cpu.Average()/(n*14*3),
+                    currentWorkingSetMb=Process.GetCurrentProcess().WorkingSet64/1048576.0,
                     meanAllocatedMb=allocations.Average()/1048576,
                     peakWorkingSetMb=Process.GetCurrentProcess().PeakWorkingSet64/1048576.0,
                     samples=measurements
