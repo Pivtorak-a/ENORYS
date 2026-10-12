@@ -87,7 +87,7 @@ static class Program {
                 "rejected recipe must not mutate material state");
 
             var extraModuleHost=new ModuleHost();
-            extraModuleHost.Install(new FocusBehavior());
+            extraModuleHost.LoadTrustedAssembly(typeof(FocusBehavior).Assembly.Location);
             var pluginWorld=new SurvivalWorld(custom,new SurvivalConfig(22,24,3));
             var pluginRun=new Engine(pluginWorld,custom,extraModuleHost,
                 new EngineOptions(Planning:false,Social:false,CognitiveLod:false)).Run();
