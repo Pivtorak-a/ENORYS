@@ -119,6 +119,18 @@ internal static class Program {
             Assert(acted.Nodes.Any(n=>n.Stage=="decision")&&
                    acted.Edges.Any(e=>e.Relation=="motivated-action"),
                 "executed decision records why an actor chose a real-world action");
+            var chosen=acted.Nodes.Single(n=>n.Stage=="decision");
+            var why=graph.Explain(actor.Id,chosen.Id);
+            Assert(why.ReachedObservation&&why.Causes.Any(n=>n.Stage=="belief")&&
+                   why.Causes.Any(n=>n.Stage=="affect")&&
+                   why.Causes.Any(n=>n.Stage=="goal")&&why.Links.Count>=4,
+                "Decision Inspector explains the entire source-to-action causal chain");
+            Assert(graph.Explain("A004",chosen.Id).Causes.Count==0,
+                "Decision Inspector cannot retrieve another actor's private explanations");
+            double initialBias=graph.ActionBias(actor,"survival:investigate",null,10);
+            Assert(graph.ActionBias(actor,"survival:investigate",null,100)<initialBias,
+                "causal action utilities decay lazily without rebuilding the graph");
+
             long previous=acted.Recomputed;int count=acted.Nodes.Count;
             graph.Observe(actor,first with{Tick=11},emotions,11);
             var repeated=graph.Inspect(actor.Id);
