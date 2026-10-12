@@ -202,10 +202,13 @@ internal static class Program {
                 for(int seed=100;seed<103;seed++){
                     // Rotate test order to reduce JIT/GC/runner thermal bias.
                     int[][] orders=[[0,1,2,3],[2,3,0,1],[1,0,3,2]];
+                    Record? full=null,conservative=null;
                     foreach(int variant in orders[seed-100]){
                         var result=Run(root,domain,new Case(seed,Active+Background,Active,
                             scenario.days,variant!=0,9,true,scenario.visibility,scenario.resources,
                             Trace:false,Wheel:variant!=2,Conservative:variant==3));
+                        if(variant==0)full=result;
+                        if(variant==3)conservative=result;
                         if(!result.Outcome.World.ResourcesBalanced ||
                            result.Outcome.World.Turns!=(Active+Background)*scenario.days*3)
                             throw new InvalidOperationException("World corrupt");
@@ -214,6 +217,17 @@ internal static class Program {
                             details=result.Summary()
                         }));
                     }
+                    if(full==null||conservative==null)throw new Exception("Missing quality controls");
+                    double healthDelta=conservative.Outcome.World.AverageHealth-
+                        full.Outcome.World.AverageHealth;
+                    if(Math.Abs(healthDelta)>1.5||conservative.Outcome.World.Alive!=full.Outcome.World.Alive)
+                        throw new Exception("Conservative background LOD exceeds defined 7-day health/alive guardrail");
+                    Console.WriteLine("HYBRID_QUALITY "+JsonSerializer.Serialize(new{
+                        scenario=scenario.label,seed,healthDelta,livePopulation=full.Outcome.World.Alive,
+                        conservesMaterials=conservative.Outcome.World.ResourcesBalanced,
+                        conservativeSkipped=conservative.Outcome.SkippedDecisions,
+                        maxAllowedHealthDeviation=1.5
+                    }));
                 }
             }
             Console.WriteLine("HYBRID_BENCHMARKS PASS");
