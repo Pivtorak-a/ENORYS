@@ -10,7 +10,7 @@ public sealed record SurvivalConfig(int Seed=42,int Agents=24,int Days=14,int Tu
 
 internal sealed class Survivor {
     public required string Id;
-    public int Zone,Group;
+    public int Zone,Group,Index;
     public bool Alive=true;
     public double Health=95,Injury,Infection;
     public required Traits Traits;
@@ -20,12 +20,16 @@ internal sealed class Survivor {
     public HashSet<string> Acted=new(StringComparer.Ordinal);
 }
 
-public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
+public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal, IWorldFastForward, IPrivateWakeFeed {
     const string S="survival:";
     public readonly DomainRegistry Domain;
     public readonly SurvivalConfig Config;
     private readonly Survivor[] people;
     private readonly Dictionary<string,Survivor> byId;
+    private readonly Dictionary<int,Survivor[]> zones;
+    private readonly Dictionary<string,WorldEvent> incidents=new(StringComparer.Ordinal);
+    private readonly Queue<int> dirtyActors=new();
+    private readonly HashSet<int> dirtySet=new();
     private readonly Dictionary<string,int> depot,sources,initial,consumed,converted;
     private IReadOnlyDictionary<string,int>? depotView;
     private IReadOnlyDictionary<string,bool>? sourcesView;
@@ -53,7 +57,7 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
     static double Need(Survivor a,string key)=>a.Needs.GetValueOrDefault(S+key);
     static double Limit(double v)=>Math.Clamp(v,0,100);
     public SurvivalWorld(DomainRegistry domain,SurvivalConfig config){
-        if(config.Seed<0||config.Agents is <12 or >500||config.Days is <1 or >100||
+        if(config.Seed<0||config.Agents is <12 or >6000||config.Days is <1 or >100||
           config.TurnsPerDay is <1 or >10||config.Resources is <0 or >3||
           config.Visibility is <0 or >1||config.Misidentification is <0 or >1||config.Cold is <0 or >1)
             throw new ArgumentOutOfRangeException(nameof(config));
@@ -64,7 +68,10 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
             if(!domain.Needs.ContainsKey(S+needed))throw new InvalidOperationException("Missing survival need "+needed);
         var rng=new Random(config.Seed);
         people=Enumerable.Range(0,config.Agents).Select(i=>{
-            var p=new Survivor{Id=$"A{i+1:D3}",Zone=i%4,Group=i%3,
+            var p=new Survivor{Id=$"A{i+1:D3}",Index=i,
+                // Large populations spread into smaller, interleaved zones.
+                // Early (active) and later (background) NPCs can still meet.
+                Zone=config.Agents>500?i%Math.Max(4,config.Agents/32):i%4,Group=i%3,
                 Traits=new Traits(rng.NextDouble(),rng.NextDouble(),rng.NextDouble(),rng.NextDouble(),rng.NextDouble(),rng.NextDouble())};
             foreach(var item in Domain.Items.Keys)p.Inv[item]=0;
             foreach(var nd in Domain.Needs.Values)p.Needs[nd.Id]=Math.Floor(18+rng.NextDouble()*18);
@@ -75,6 +82,7 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
             return p;
         }).ToArray();
         byId=people.ToDictionary(x=>x.Id,x=>x,StringComparer.Ordinal);
+        zones=people.GroupBy(p=>p.Zone).ToDictionary(g=>g.Key,g=>g.ToArray());
         depot=Empty(); sources=Empty();
         void Seed(Dictionary<string,int> d,string k,double n)=>d[S+k]=(int)Math.Round(n*config.Resources,MidpointRounding.AwayFromZero);
         Seed(depot,"food",Math.Ceiling(config.Agents*.2));Seed(depot,"water",Math.Ceiling(config.Agents*.25));
@@ -98,6 +106,13 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
     }
     public bool IsAlive(int index)=>people[index].Alive;
     public bool HasPendingObservation(int index)=>inbox[people[index].Id].Count>0;
+    public void DrainWakeSignals(List<int> destination){
+        while(dirtyActors.Count>0){
+            int agent=dirtyActors.Dequeue();
+            dirtySet.Remove(agent);
+            destination.Add(agent);
+        }
+    }
     public AgentView GetPrivateAgent(int index){
         var a=people[index];
         if(a.CachedView!=null)return a.CachedView;
@@ -114,8 +129,8 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
         peersView=new IReadOnlyList<string>[people.Length];
         for(int i=0;i<people.Length;i++){
             var a=people[i];
-            peersView[i]=Array.AsReadOnly(people.Where(p=>p.Alive&&p.Zone==a.Zone&&p.Id!=a.Id)
-                .Select(p=>p.Id).ToArray());
+            peersView[i]=Array.AsReadOnly(zones[a.Zone]
+                .Where(p=>p.Alive&&p.Index!=a.Index).Select(p=>p.Id).ToArray());
         }
     }
     public ObservationPacket Observe(int index){
@@ -131,7 +146,10 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
         return new ObservationPacket(tick,day,Config.Cold,depotView,sourcesView,peersView[index],messages);
     }
     void Send(string? to,Message message){
-        if(to!=null&&byId.TryGetValue(to,out var a)&&a.Alive)inbox[to].Add(message);
+        if(to!=null&&byId.TryGetValue(to,out var a)&&a.Alive){
+            inbox[to].Add(message);
+            if(dirtySet.Add(a.Index))dirtyActors.Enqueue(a.Index);
+        }
     }
     public ActionResult Execute(ActionProposal p){
         if(p is null||!byId.TryGetValue(p.Actor,out var actor)||!actor.Alive)throw new ArgumentException("Invalid actor");
@@ -176,8 +194,8 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
               sources[S+gathered]--;a.Inv[S+gathered]++;break;
             case "take":
               depot[item]--;a.Inv[item]++;evt=evt with {Incident=$"E{events.Count+1:D6}"};
-              foreach(var witness in people.Where(x=>x.Alive&&x.Zone==a.Zone&&x.Id!=a.Id)){
-                 int wi=Array.IndexOf(people,witness);
+              foreach(var witness in zones[a.Zone].Where(x=>x.Alive&&x.Id!=a.Id)){
+                 int wi=witness.Index;
                  if(RandomKey(wi,tick,47)>=Config.Visibility)continue;
                  bool mistaken=RandomKey(wi,tick,71)<Config.Misidentification;
                  string suspect=mistaken?people.First(x=>x.Id!=a.Id&&x.Id!=witness.Id).Id:a.Id;
@@ -185,6 +203,7 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
                  Send(witness.Id,new Message("evidence",witness.Id,Incident:evt.Incident,Root:root,Suspect:suspect,LogLikelihood:Math.Log(8),Source:"eyewitness",Tick:tick));
                  EyeWitnesses++;
               }
+              incidents[evt.Incident!]=evt;
               break;
             case "give":case "repay":
               a.Inv[item]--;target!.Inv[item]++;
@@ -194,15 +213,15 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
             case "tell":Send(target!.Id,new Message("evidence",a.Id,Incident:p.Incident,Root:p.Root,Suspect:p.Suspect,LogLikelihood:p.LogLikelihood*.6,Source:"hearsay",Tick:tick));break;
             case "retract":Send(target!.Id,new Message("retract",a.Id,Root:p.Root,Tick:tick));break;
             case "investigate":
-              var incident=events.FirstOrDefault(e=>e.Incident==p.Incident&&e.Kind=="take");
+              incidents.TryGetValue(p.Incident!,out var incident);
               if(incident!=null){
-                  bool mistaken=RandomKey(Array.IndexOf(people,a),tick,77)<.20;
-                  string suspect=mistaken?people[(Array.IndexOf(people,a)+2)%people.Length].Id:incident.Actor;
+                  bool mistaken=RandomKey(a.Index,tick,77)<.20;
+                  string suspect=mistaken?people[(a.Index+2)%people.Length].Id:incident.Actor;
                   Send(a.Id,new Message("evidence",a.Id,Incident:incident.Incident,Root:incident.Incident+"/clue/"+a.Id,Suspect:suspect,LogLikelihood:Math.Log(5),Source:"trace",Tick:tick));
               }
               a.Acted.Add("investigate:"+p.Incident);break;
             case "accuse":
-              bool correct=events.Any(e=>e.Incident==p.Incident&&e.Actor==p.Target&&e.Kind=="take");
+              bool correct=incidents.TryGetValue(p.Incident!,out var original)&&original.Actor==p.Target;
               if(correct)AccurateAccusations++;else FalseAccusations++;
               Send(target?.Id,new Message("accused",a.Id,Incident:p.Incident,Tick:tick));
               a.Acted.Add("accuse:"+p.Incident+":"+p.Target);break;
@@ -228,25 +247,34 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
         actions[k]=actions.GetValueOrDefault(k)+1;
         return new ActionResult(true,"accepted",evt);
     }
-    public void Advance(){
-        tick++;
-        if(tick>0&&tick%(people.Length*Config.TurnsPerDay)==0){
-            day++;
-            bool anyDeath=false;
-            foreach(var a in people.Where(p=>p.Alive)){
-                a.CachedView=null;
-                foreach(var n in Domain.Needs.Values)a.Needs[n.Id]=Limit(a.Needs[n.Id]+n.Daily);
-                a.Needs[S+"cold"]=Limit(Need(a,"cold")+(Config.Cold>.7?11:4)-
-                    (Can(a,"coat")?5:0)-(Can(a,"shelter")?7:0));
-                if(Need(a,"hunger")>85)a.Health-=5;
-                if(Need(a,"thirst")>85)a.Health-=9;
-                if(Need(a,"cold")>85)a.Health-=4;
-                if(a.Infection>0)a.Health-=a.Infection*.03;
-                if(Need(a,"hygiene")>85)a.Infection=Limit(a.Infection+3);
-                a.Health=Limit(a.Health);
-                if(a.Health<=0){a.Alive=false;anyDeath=true;}
+    public void Advance()=>AdvanceSlots(1);
+    public void AdvanceSlots(int slots){
+        if(slots<0||tick+slots>TotalTurns)
+            throw new ArgumentOutOfRangeException(nameof(slots));
+        long target=tick+slots;
+        long daySize=(long)people.Length*Config.TurnsPerDay;
+        while(tick<target){
+            long boundary=(tick/daySize+1)*daySize;
+            tick=Math.Min(target,boundary);
+            if(tick==boundary){
+                day++;
+                bool anyDeath=false;
+                foreach(var a in people.Where(p=>p.Alive)){
+                    a.CachedView=null;
+                    foreach(var n in Domain.Needs.Values)
+                        a.Needs[n.Id]=Limit(a.Needs[n.Id]+n.Daily);
+                    a.Needs[S+"cold"]=Limit(Need(a,"cold")+(Config.Cold>.7?11:4)-
+                        (Can(a,"coat")?5:0)-(Can(a,"shelter")?7:0));
+                    if(Need(a,"hunger")>85)a.Health-=5;
+                    if(Need(a,"thirst")>85)a.Health-=9;
+                    if(Need(a,"cold")>85)a.Health-=4;
+                    if(a.Infection>0)a.Health-=a.Infection*.03;
+                    if(Need(a,"hygiene")>85)a.Infection=Limit(a.Infection+3);
+                    a.Health=Limit(a.Health);
+                    if(a.Health<=0){a.Alive=false;anyDeath=true;}
+                }
+                if(anyDeath)InvalidatePublicViews(peerChanged:true);
             }
-            if(anyDeath)InvalidatePublicViews(peerChanged:true);
         }
     }
     static bool Can(Survivor a,string id)=>Quantity(a.Inv,S+id)>0;
