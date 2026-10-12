@@ -104,7 +104,7 @@ public sealed partial class SurvivalBehavior : IEnorysModule, IDecisionModule, I
             Span<double> values=stackalloc double[64];
             for(int i=0;i<candidates.Count;i++){
                 var c=candidates[i];
-                values[i]=c.Utility+ctx.EmotionBias(a,c.Proposal.Kind,c.Proposal.Target,p.Tick);
+                values[i]=c.Utility+ctx.EmotionBias(a,c.Proposal.Kind,c.Proposal.Target,p.Tick)+ctx.CausalBias(a,c.Proposal.Kind,c.Proposal.Target,p.Tick);
             }
             int winner=choiceKernel.ArgMax(values[..candidates.Count]);
             if(winner<0||winner>=candidates.Count)
@@ -113,10 +113,10 @@ public sealed partial class SurvivalBehavior : IEnorysModule, IDecisionModule, I
             return new Decision(result.Proposal,"deliberate",result.Reason,candidates.Count,values[winner]);
         }
         var selected=candidates[0];
-        double best=selected.Utility+ctx.EmotionBias(a,selected.Proposal.Kind,selected.Proposal.Target,p.Tick);
+        double best=selected.Utility+ctx.EmotionBias(a,selected.Proposal.Kind,selected.Proposal.Target,p.Tick)+ctx.CausalBias(a,selected.Proposal.Kind,selected.Proposal.Target,p.Tick);
         for(int i=1;i<candidates.Count;i++){
             var x=candidates[i];
-            double score=x.Utility+ctx.EmotionBias(a,x.Proposal.Kind,x.Proposal.Target,p.Tick);
+            double score=x.Utility+ctx.EmotionBias(a,x.Proposal.Kind,x.Proposal.Target,p.Tick)+ctx.CausalBias(a,x.Proposal.Kind,x.Proposal.Target,p.Tick);
             if(score>best){selected=x;best=score;}
         }
         return new Decision(selected.Proposal,"deliberate",selected.Reason,candidates.Count,best);
@@ -156,7 +156,7 @@ public sealed partial class SurvivalBehavior : IEnorysModule, IDecisionModule, I
     }
 
     public Decision? TryFastDecision(AgentView a,ObservationPacket p,IDecisionContext ctx){
-        if(ctx.HasAffect || a.Health<45||a.Infection>45||a.Injury>50||a.PlanGoal==null)return null;
+        if(ctx.HasAffect || ctx.HasCausalGraph || a.Health<45||a.Infection>45||a.Injury>50||a.PlanGoal==null)return null;
         if(ctx.SocialEnabled && (a.Evidence.Any(x=>x.Active)||a.Requests.Count>0||
              a.Debts.Any(x=>x.Value>0)||a.PendingCorrections.Count>0||
              (p.Nearby.Count>0&&(N(a,"thirst")>.56&&I(a,"water")==0||

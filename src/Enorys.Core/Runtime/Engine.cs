@@ -24,6 +24,8 @@ public sealed record EngineResults(WorldMetrics World,long Automatic,long Delibe
     public long CertificateAbstentions {get;init;}
     public long CertificateAudits {get;init;}
     public long CertificateThrottled {get;init;}
+    public long CausalObservations {get;init;}
+    public long CausalDecisions {get;init;}
 }
 /// <summary>Core owns cognition, World Adapter owns truth and material state.</summary>
 public sealed class Engine {
@@ -39,6 +41,8 @@ public sealed class Engine {
     private readonly List<int> dirtyBuffer=new();
     private long backgroundDecisions,activeDecisions,fastForwardCalls,messagesProcessed,affectMessagesProcessed,memoryEvidenceProcessed;
     private readonly IReadOnlyList<IAffectiveModule> affects;
+    private readonly IReadOnlyList<ICausalGraphModule> causalGraphs;
+    private long causalObservations,causalDecisions;
     private readonly IReadOnlyList<ICognitiveWakeSignal> wakeContributors;
     private readonly int cognitiveTickStride;
     private long cognitiveWakeVetoes;
@@ -55,6 +59,13 @@ public sealed class Engine {
         public bool LodEnabled=>engine.options.CognitiveLod;
         public bool AuditLod=>engine.options.AuditLod;
         public bool HasAffect=>engine.affects.Count>0;
+        public bool HasCausalGraph=>engine.causalGraphs.Count>0;
+        public double CausalBias(AgentView agent,string actionKind,string? target,long tick){
+            double score=0;
+            foreach(var module in engine.causalGraphs)
+                score+=module.ActionBias(agent,actionKind,target,tick/engine.cognitiveTickStride);
+            return Math.Clamp(score,-1,1);
+        }
         public bool IsAffectNeutral(AgentView a,long tick){
             foreach(var affect in engine.affects){
                 if(affect is not IAffectNeutrality neutrality||
@@ -106,6 +117,7 @@ public sealed class Engine {
         }
         wakePolicy=host.WakePolicies.FirstOrDefault();
         affects=host.AffectiveModules;
+        causalGraphs=host.CausalGraphs;
         wakeContributors=host.CognitiveWakeSignals;
         cognitiveTickStride=options.NormalizeCognitiveClock?world.AgentCount:1;
         if(options.EventScheduling && wakePolicy!=null)scheduler=new WakeScheduler(world.AgentCount);
@@ -188,6 +200,16 @@ public sealed class Engine {
                 affect.Receive(actor,obs with {Tick=obs.Tick/cognitiveTickStride});
                 affectMessagesProcessed+=obs.Messages.Count;
             }
+            if(obs.Messages.Count>0 && causalGraphs.Count>0){
+                IReadOnlyList<EmotionActivation> feelings=affects.Count==0
+                    ? Array.Empty<EmotionActivation>()
+                    :affects.SelectMany(module=>module.Inspect(actor.Id,
+                        obs.Tick/cognitiveTickStride)).ToArray();
+                foreach(var graph in causalGraphs){
+                    graph.Observe(actor,obs,feelings,obs.Tick/cognitiveTickStride);
+                    causalObservations+=obs.Messages.Count;
+                }
+            }
             var ctx=new Context(this,mind);
             var before=System.Diagnostics.Stopwatch.GetTimestamp();
             Enorys.Abstractions.Decision choice;
@@ -252,6 +274,12 @@ public sealed class Engine {
             }
             candidateChecks+=choice.CandidateCount;
             var result=world.Execute(choice.Proposal);
+            if(causalGraphs.Count>0){
+                foreach(var graph in causalGraphs){
+                    graph.RecordDecision(actor,choice,result,obs.Tick/cognitiveTickStride);
+                    causalDecisions++;
+                }
+            }
             if(result.Accepted){
                 mind.OnAccepted(choice.Proposal,obs.Day,obs.Tick);
                 foreach(var affect in affects)affect.ObserveOwnAction(actor,choice.Proposal,obs.Tick/cognitiveTickStride);
@@ -306,7 +334,8 @@ public sealed class Engine {
                 CertifiedDecisions=certified,
                 CertificateAbstentions=certificateAbstentions,
                 CertificateAudits=certificateAudits,
-                CertificateThrottled=certificateThrottled
+                CertificateThrottled=certificateThrottled,
+                CausalObservations=causalObservations,CausalDecisions=causalDecisions
             };
     }
 }
