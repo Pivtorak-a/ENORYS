@@ -91,7 +91,7 @@ static class Program {
             var pluginWorld=new SurvivalWorld(custom,new SurvivalConfig(22,24,3));
             var pluginRun=new Engine(pluginWorld,custom,extraModuleHost,
                 new EngineOptions(Planning:false,Social:false,CognitiveLod:false)).Run();
-            Check(pluginRun.World.Actions.GetValueOrDefault("drink-tea")>0,
+            Check(pluginRun.World.Actions.GetValueOrDefault("demo:drink-tea")>0,
                 "external C# plugin executes custom decisions end-to-end");
             Check(pluginRun.World.ResourcesBalanced,"plugin conserves resources");
             var rejected=extra.Execute(new ActionProposal(before.Id,"unknown:illegal-action"));
