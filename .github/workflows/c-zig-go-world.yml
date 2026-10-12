@@ -1,0 +1,37 @@
+name: ENORYS C Zig Go Entire-World Comparison
+on:
+  push:
+    branches: [experiment/c-zig-go-full-runtime]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  cross-language-bench:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: '0.14.1'
+      - name: Build native libraries with optimization
+        run: |
+          gcc -O3 -fPIC -shared native/choice_argmax.c -o native/libenorys_choice_c.so -Wall -Wextra -Werror -lm
+          zig build-lib native/choice_argmax.zig -dynamic -O ReleaseFast -fPIC -femit-bin=native/libenorys_choice_zig.so
+          CGO_ENABLED=1 go build -buildmode=c-shared -o native/libenorys_choice_go.so native/go_choice/main.go
+          ls -lh native/*choice*.so
+      - name: Build modular .NET engine
+        run: dotnet build tests/Enorys.Integration/Enorys.Integration.csproj -c Release
+      - name: Profile actual 500-NPC simulation
+        run: dotnet run --project tests/Enorys.Integration -c Release --no-build -- profile
+      - name: Verify all backends produce identical NPC histories, then benchmark
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/native
+        run: dotnet run --project tests/Enorys.Integration -c Release --no-build -- compare-native
