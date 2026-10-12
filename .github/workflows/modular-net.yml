@@ -1,0 +1,25 @@
+name: Modular .NET Runtime
+on:
+  push:
+    branches: [main, develop, feature/net10-modular-runtime-v05]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test-and-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build C# modular runtime
+        run: dotnet build tests/Enorys.Integration/Enorys.Integration.csproj --configuration Release
+      - name: Test C# migration
+        run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- test
+      - name: Reproducible C# scenario CLI
+        run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- simulate 42 24 14 > /tmp/enorys-scenario.json
+      - name: Baseline versus LOD benchmarks
+        run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- bench
