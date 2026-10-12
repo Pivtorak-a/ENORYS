@@ -184,6 +184,32 @@ internal static unsafe class Program {
         }
     }
 
+    private static void ValidateEdgeCases() {
+        NativeCause[] cases=[new NativeCause(0,0,1),new NativeCause(1,1,1)];
+        double[] posterior=new double[2],diag=new double[3],leaks=[0,1];
+        fixed(NativeCause* c=cases)
+        fixed(double* p=posterior)
+        fixed(double* d=diag)
+        fixed(double* l=leaks) {
+            if(Native.Solve(c,1,0,p,d)!=2)
+                throw new Exception("Impossible event not rejected");
+            if(Native.Solve(c,1,-.1,p,d)!=1)
+                throw new Exception("Negative leak not rejected");
+            if(Native.Solve(c+1,1,0,p,d)!=0)
+                throw new Exception("Certain cause not accepted");
+            Near(p[0],1);
+            Near(d[0],0);
+            Near(d[1],0);
+            if(Native.Solve(c+1,1,1,p,d)!=0)
+                throw new Exception("Certain leak not accepted");
+            Near(p[0],1);
+            Near(d[1],1);
+            if(Native.Batch(c,1,l,-1,p,d)!=1)
+                throw new Exception("Invalid batch size not rejected");
+        }
+        Console.WriteLine("NATIVE_BOUNDARIES impossible evidence, leak extremes, malformed inputs passed");
+    }
+
     private static int Main(){
         Console.WriteLine("NATIVE_ENV "+JsonSerializer.Serialize(new {
             version=Environment.Version.ToString(),framework=RuntimeInformation.FrameworkDescription,
@@ -192,6 +218,7 @@ internal static unsafe class Program {
         }));
         try{
             // Run many random inputs to verify mathematical correspondence before timing.
+            ValidateEdgeCases();
             Validate(Prepare(2,1000),2);
             Validate(Prepare(8,1000),8);
             Console.WriteLine("NATIVE_CORRECTNESS 2000 randomly generated independent scenarios passed");
