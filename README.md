@@ -19,6 +19,27 @@ dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Relea
 
 **Measured:** 500 NPCs × 14 days × 3 turns/day = 21,000 decisions in ~303 ms median on a GitHub x64 Linux .NET 10 runner; process peak ~98 MB, short-lived allocation ~12.45 KB/turn. Read the [benchmark report](docs/NET-MIGRATION-BENCHMARK.md) for workload, CI data, GC counts and limitations. These values are **not** Godot FPS.
 
+## v0.6 — Wake Scheduler and modular emotional cognition (experimental)
+
+The C# engine now supports:
+- **Cached immutable world and actor-private views** to reduce temporary allocation pressure;
+- **Hybrid event-aware wake scheduling** with domain-defined sleep policies and message-triggered early wakeups (opt-in; may change simulated decisions);
+- Optional **Affective Cognitive Map** (`src/Enorys.Affect.ACM/`): source-linked subjective anger, fear, sadness, gratitude and guilt, lazy decay, retractions and bounded influence on decisions;
+- **Custom emotions and triggers entirely from JSON** (`data-packs/affect-custom.json`), without changing Core;
+- End-to-end tests for mixed emotions, evidence anti-echo, private data isolation, accurate material ledger and scheduler replay.
+
+Run the additional benchmark suites:
+
+```bash
+dotnet run --project tests/Enorys.Integration -c Release -- test
+dotnet run --project tests/Enorys.Integration -c Release -- bench-scheduler
+dotnet run --project tests/Enorys.Integration -c Release -- bench-acm
+```
+
+**Observed 500-NPC batch allocation:** about **10.36 KB / nominal actor turn** with ACM off and scheduler off, down from ~12.45 KB in v0.5. This is still above the provisional <3 KB/turn optimization goal. Full methodology, timing variability, and ACM costs: [Experiment 005 — .NET Scheduler and ACM](docs/EXPERIMENT-005-NET-SCHEDULER-ACM.md).
+
+**Scope:** first optional functional emotional module and hybrid wake scheduling, **not** a full validated emotional cognition architecture, a no-scan discrete-event scheduler or a Godot frame-rate test.
+
 ## Legacy research demos (JavaScript)
 
 
