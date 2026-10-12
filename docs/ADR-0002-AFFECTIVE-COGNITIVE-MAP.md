@@ -1,6 +1,6 @@
 # ADR-0002 — Affective Cognitive Map (ACM) for ENORYS
 
-**Status:** Proposed; design specification, **NOT IMPLEMENTED** in the .NET core.
+**Status:** Partially implemented experimental C# module (`src/Enorys.Affect.ACM`) as of 2026-10-12. The full semantic appraisal graph, persistence and psychological validation remain proposed. See [Experiment 005](EXPERIMENT-005-NET-SCHEDULER-ACM.md).
 **Date:** 2026-10-12
 **Context:** ENORYS v0.4 JS sandbox and the previously audited NOEMYN Cognitive PoC v0.1.1 specification.
 
