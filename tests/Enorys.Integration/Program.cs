@@ -325,6 +325,22 @@ static class Program {
             }
         }
         Console.WriteLine("NATIVE_CHOICE_CORRECTNESS 24/100/500 NPC, 2 seeds, all 5 backends replay-identical");
+        var measuredKernel=new TimedChoice(new ManagedSpanChoice());
+        var instrumentedHost=new ModuleHost();
+        instrumentedHost.Install(new SurvivalBehavior(measuredKernel));
+        var instrumentedWorld=new SurvivalWorld(domain,new SurvivalConfig(612,500,14,3,.55));
+        var instrumentedWatch=Stopwatch.StartNew();
+        var instrumentedResult=new Engine(instrumentedWorld,domain,instrumentedHost,
+            new EngineOptions(CognitiveLod:false)).Run();
+        instrumentedWatch.Stop();
+        Console.WriteLine("NATIVE_CHOICE_SHARE "+JsonSerializer.Serialize(new{
+            agents=500,nominalTurns=instrumentedResult.World.Turns,
+            elapsedMs=instrumentedWatch.Elapsed.TotalMilliseconds,
+            fullDecisionMs=instrumentedResult.ElapsedDecisionTicks*1000.0/Stopwatch.Frequency,
+            argmaxWithTimerMs=measuredKernel.Ticks*1000.0/Stopwatch.Frequency,
+            argmaxCalls=measuredKernel.Calls,resourceBalanced=instrumentedResult.World.ResourcesBalanced
+        }));
+
 
         for(int agentsIndex=0;agentsIndex<3;agentsIndex++){
             int agents=new[]{24,100,500}[agentsIndex];
