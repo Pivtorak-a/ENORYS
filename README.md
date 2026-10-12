@@ -40,6 +40,14 @@ dotnet run --project tests/Enorys.Integration -c Release -- bench-acm
 
 **Scope:** first optional functional emotional module and hybrid wake scheduling, **not** a full validated emotional cognition architecture, a no-scan discrete-event scheduler or a Godot frame-rate test.
 
+## Native C calculation experiment (optional)
+
+An independent native C library now benchmarks exact Noisy-OR causal inference against the existing C# math and a no-allocation C# implementation. **It is an experiment, not a mandatory ENORYS runtime dependency.**
+
+On Linux x64 (GCC `-O3`, .NET 10), 40,000 two-cause evaluations ran in **15.45 ms** with original C#, **6.66 ms** in optimized C#, and **4.87 ms** via native C/P-Invoke. Larger eight-cause evaluations showed smaller native gains. [Read the complete benchmark, numeric verification and caveats](docs/EXPERIMENT-006-C-VS-CSHARP.md).
+
+The C source is in [native/](native/), and the runnable comparison is in [benchmarks/Enorys.NativeMath/](benchmarks/Enorys.NativeMath/). Windows and macOS binary compatibility and speed are unverified.
+
 ## Legacy research demos (JavaScript)
 
 
