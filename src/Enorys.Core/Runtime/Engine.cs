@@ -9,7 +9,8 @@ namespace Enorys.Core.Runtime;
 
 public sealed record EngineOptions(bool Planning=true,bool Social=true,bool CognitiveLod=true,bool AuditLod=false,bool EventScheduling=false,
     int HybridActiveAgents=0,int BackgroundMaximumRounds=9,
-    int BackgroundRoundsPerDay=3,bool CaptureHistory=true,bool NormalizeCognitiveClock=false);
+    int BackgroundRoundsPerDay=3,bool CaptureHistory=true,bool NormalizeCognitiveClock=false,
+    bool HybridUseTimingWheel=true);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
     string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}
@@ -28,7 +29,7 @@ public sealed class Engine {
     private readonly EngineOptions options;
     private readonly WakeScheduler? scheduler;
     private readonly IWakePolicy? wakePolicy;
-    private readonly PulseCalendar? calendar;
+    private readonly IPulseActivationCalendar? calendar;
     private readonly IBackgroundDeadlinePolicy? deadlinePolicy;
     private readonly List<int> dirtyBuffer=new();
     private long backgroundDecisions,activeDecisions,fastForwardCalls,messagesProcessed,affectMessagesProcessed,memoryEvidenceProcessed;
@@ -86,7 +87,9 @@ public sealed class Engine {
                world is not IWorldFastForward || world is not IPrivateWakeFeed ||
                deadlinePolicy==null)
                 throw new InvalidOperationException("Pulse hybrid requires fast-forward world, non-consuming private wake feed and a registered background deadline policy (and cannot combine with legacy EventScheduling)");
-            calendar=new PulseCalendar(world.AgentCount,options.HybridActiveAgents);
+            calendar=options.HybridUseTimingWheel
+                ?new PulseWheelCalendar(world.AgentCount,options.HybridActiveAgents)
+                :new PulseCalendar(world.AgentCount,options.HybridActiveAgents);
         }
     }
     private AgentView PrivateSnapshot(AgentView baseView,ObservationPacket packet,AgentMind mind) {
@@ -112,7 +115,7 @@ public sealed class Engine {
                 }
                 dirtyBuffer.Clear();
                 if(index>=options.HybridActiveAgents){
-                    long due=calendar.NextDue;
+                    long due=calendar.NextDueFrom(world.Tick);
                     if(due>world.Tick){
                         // Never skip over an active actor slot: physics/day effects
                         // are advanced in the authoritative World Adapter.
