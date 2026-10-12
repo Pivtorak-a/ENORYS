@@ -132,3 +132,9 @@ public interface IBackgroundDeadlinePolicy {
     int NextWakeRounds(AgentView afterAction,ObservationPacket observations,
         int roundsPerDay,int maxRounds);
 }
+
+/** Optional trusted scenario stimuli deadline, so world fast-forward never skips
+    an external event that might awaken an otherwise dormant cognitive agent. */
+public interface IWorldScheduledStimuli {
+    long NextExternalStimulusTick {get;}
+}
