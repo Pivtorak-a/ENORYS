@@ -187,4 +187,8 @@ public interface ICausalGraphModule {
         ActionResult outcome,long cognitiveTick);
     double ActionBias(AgentView privateAgent,string actionKind,string? target,long cognitiveTick);
     CausalSnapshot Inspect(string agentId);
+    CausalExplanation Explain(string agentId,string decisionNodeId);
 }
+public sealed record CausalExplanation(string AgentId,string DecisionNodeId,
+    IReadOnlyList<CausalNode> Causes,IReadOnlyList<CausalEdge> Links,bool ReachedObservation);
+
