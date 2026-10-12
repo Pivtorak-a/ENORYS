@@ -6,18 +6,20 @@ public record NeedDefinition(string Id, double Daily, double Weight = 1, double 
 public record ItemDefinition(string Id, string Category);
 public record RecipeDefinition(string Id, Dictionary<string,int> Inputs, Dictionary<string,int> Outputs);
 public record GoalDefinition(string Id,string NeedId,string ItemId,string UseAction,double Threshold);
+public record SourceDefinition(string ItemId,string ActionId);
 public record ActionDefinition(string Id,string ItemId,string NeedId,double NeedDelta);
 public record DomainPack(string Id,string Namespace,string Version,
     List<NeedDefinition> Needs,List<ItemDefinition> Items,
     List<RecipeDefinition> Recipes,List<GoalDefinition> Goals,
-    List<ActionDefinition> Actions);
+    List<ActionDefinition> Actions,List<SourceDefinition> Sources);
 
 public record AgentView(string Id,int Zone,int Group,bool Alive,
     IReadOnlyDictionary<string,int> Inventory,IReadOnlyDictionary<string,double> Needs,
     Traits Personality,double Health,double Injury,double Infection,
     string? PlanGoal,IReadOnlyList<PrivateEvidence> Evidence,
     IReadOnlyDictionary<string,double> Trust,IReadOnlyDictionary<string,int> Debts,
-    IReadOnlyList<string> Nearby,IReadOnlyList<HelpRequest> Requests);
+    IReadOnlyList<string> Nearby,IReadOnlyList<HelpRequest> Requests,
+    IReadOnlySet<string> Acted,IReadOnlySet<string> Reported);
 
 public record Traits(double Greed,double Generosity,double Norm,double Courage,double Curiosity,double Sociability);
 public record PrivateEvidence(string Root,string Incident,string Suspect,double LogLikelihood,
@@ -55,10 +57,15 @@ public interface IDecisionModule {
     Decision Choose(AgentView agent,ObservationPacket observations,IDecisionContext context);
 }
 public interface IDecisionContext {
+    ActionProposal? PlannedStep(AgentView agent,ObservationPacket packet);
+    bool CanSpare(AgentView agent,string item);
     bool PlanningEnabled { get; }
     bool SocialEnabled { get; }
     bool LodEnabled { get; }
     bool AuditLod { get; }
+}
+public interface IFastDecisionModule {
+    Decision? TryFastDecision(AgentView agent, ObservationPacket observations, IDecisionContext context);
 }
 public interface IEnorysModule {
     string Id { get; }
