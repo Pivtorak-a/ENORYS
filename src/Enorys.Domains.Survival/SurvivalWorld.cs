@@ -91,7 +91,7 @@ public sealed class SurvivalWorld : IWorldAdapter {
         var a=people[index];
         return new AgentView(a.Id,a.Zone,a.Group,a.Alive,
            new Dictionary<string,int>(a.Inv),new Dictionary<string,double>(a.Needs),
-           a.Traits,a.Health,a.Injury,a.Infection,null,[],new Dictionary<string,double>(),new Dictionary<string,int>(),[],[],new HashSet<string>(),new HashSet<string>());
+           a.Traits,a.Health,a.Injury,a.Infection,null,[],new Dictionary<string,double>(),new Dictionary<string,int>(),[],[],new HashSet<string>(),new HashSet<string>(),[]);
     }
     public ObservationPacket Observe(int index){
         var a=people[index];var nearby=people.Where(p=>p.Alive&&p.Zone==a.Zone&&p.Id!=a.Id).Select(p=>p.Id).ToArray();
