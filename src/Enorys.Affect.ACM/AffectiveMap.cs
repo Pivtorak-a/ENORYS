@@ -8,12 +8,13 @@ public sealed record EmotionDefinition(string Id,double Decay,double Impulse,
 public sealed record EmotionCatalog(string Namespace,string Version,List<EmotionDefinition> Emotions);
 internal sealed record Episode(string Kind,string Target,string Root,double Initial,long Tick);
 
-public sealed class AffectiveMap : IEnorysModule, IAffectiveModule {
+public sealed class AffectiveMap : IEnorysModule, IAffectiveModule, ICognitiveWakeSignal {
     private readonly Dictionary<string,EmotionDefinition> definitions;
     private readonly Dictionary<string,Dictionary<(string Root,string Kind,string Target),Episode>> state=new(StringComparer.Ordinal);
     private readonly HashSet<string> seen=new(StringComparer.Ordinal);
     public string Id=>"enorys.affect:acm";
     public string ModuleId=>Id;
+    public string SignalId=>Id+":wake";
     public AffectiveMap(string jsonPath){
         var catalog=JsonSerializer.Deserialize<EmotionCatalog>(File.ReadAllText(jsonPath),
             new JsonSerializerOptions { PropertyNameCaseInsensitive=true })
@@ -31,7 +32,7 @@ public sealed class AffectiveMap : IEnorysModule, IAffectiveModule {
                 throw new InvalidDataException("Invalid or duplicate emotion "+id);
         }
     }
-    public void Register(IModuleRegistry registry)=>registry.AddAffectiveModule(this);
+    public void Register(IModuleRegistry registry){registry.AddAffectiveModule(this);registry.AddCognitiveWakeSignal(this);}
 
     public void Receive(AgentView agent,ObservationPacket observation){
         if(observation.Messages.Count==0)return;
@@ -107,6 +108,15 @@ public sealed class AffectiveMap : IEnorysModule, IAffectiveModule {
         return graph.Values.OrderBy(x=>x.Kind,StringComparer.Ordinal)
             .ThenBy(x=>x.Target,StringComparer.Ordinal).ThenBy(x=>x.Root,StringComparer.Ordinal)
             .Select(e=>new EmotionActivation(e.Kind,e.Target,e.Root,Intensity(e,tick),tick)).ToArray();
+    }
+    public int MaximumSleepRounds(string agentId,long cognitiveTick,int maxRounds){
+        if(!state.TryGetValue(agentId,out var graph))return maxRounds;
+        // Any still-significant subjective experience may change a later choice.
+        // Conservative default: keep revisiting until it has faded.
+        foreach(var episode in graph.Values){
+            if(Intensity(episode,cognitiveTick)>.075)return 1;
+        }
+        return maxRounds;
     }
     public double ActionBias(AgentView agent,string actionKind,string? target,long tick){
         if(!state.TryGetValue(agent.Id,out var graph))return 0;
