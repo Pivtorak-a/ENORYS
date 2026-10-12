@@ -66,6 +66,8 @@ public interface IDecisionContext {
     bool LodEnabled { get; }
     bool AuditLod { get; }
     bool HasAffect { get; }
+    bool IsAffectNeutral(AgentView agent,long tick);
+    bool NoPlanCanActivate(AgentView agent);
     int CognitiveTickStride {get;}
     double EmotionBias(AgentView agent,string actionKind,string? target,long tick);
 }
@@ -146,4 +148,18 @@ public interface IWorldScheduledStimuli {
 public interface ICognitiveWakeSignal {
     string SignalId {get;}
     int MaximumSleepRounds(string agentId,long cognitiveTick,int maxRounds);
+}
+
+/** An action-choice certificate verifies this turn's winner against every
+ * feasible candidate under explicitly checked module dependencies. It does
+ * NOT certify skipping the world's action, future turns or hidden events. */
+public sealed record ActionChoiceCertificate(Decision Choice,
+    double RunnerUpScore,double StrictMargin,string ProofId);
+public interface ICertifiedDecisionModule {
+    ActionChoiceCertificate? TryProve(AgentView agent,ObservationPacket packet,
+        IDecisionContext context);
+}
+/** Optional affect neutrality attestations; unrecognized modules fail closed. */
+public interface IAffectNeutrality {
+    bool IsNeutral(string agentId,long cognitiveTick);
 }
