@@ -60,6 +60,7 @@ public sealed class Engine {
             Nearby=packet.Nearby,
             Acted=new HashSet<string>(mind.Acted),
             Reported=new HashSet<string>(mind.Reported),
+            PendingCorrections=mind.Corrections.Select(x=>new RetractionRequest(x.Root,x.To)).ToArray(),
             PlanGoal=mind.Plan?.Goal
         };
     }
