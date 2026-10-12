@@ -202,6 +202,10 @@ static class Program {
                   Math.Abs(acm.ActionBias(mindView,"survival:accuse","A003",11))<=.6,
                 "mixed affect contributes bounded finite utility (fear may outweigh anger)");
 
+            acm.ObserveOwnAction(mindView,new ActionProposal(mindView.Id,"survival:retract",
+                Target:"A003",Root:"R1"),11);
+            Check(acm.Inspect(mindView.Id,11).Any(x=>x.EmotionId=="affect:guilt"&&x.TargetId=="A003"),
+                "own correction may create separate guilt episode");
             var customAffect=new AffectiveMap(Path.Combine(root,"data-packs/affect-custom.json"));
             customAffect.Receive(mindView,corrected);
             Check(customAffect.Inspect(mindView.Id,11).Any(x=>x.EmotionId=="customaffect:relief"),
