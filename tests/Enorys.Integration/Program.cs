@@ -54,8 +54,8 @@ static class Program {
             for(int seed=1;seed<=12;seed++){
                 var with=Run(d,host,seed,days:7,lod:true,audit:true);
                 var full=Run(d,host,seed,days:7,lod:false);
-                Check(with.Divergences==0&&with.TraceHash==full.TraceHash,
-                    "LOD action parity, seed="+seed);
+                Check(with.Divergences==0,"LOD shadow parity, seed="+seed);
+                Check(with.TraceHash==full.TraceHash,"LOD action parity, seed="+seed);
             }
             var custom=DomainRegistry.Load(Path.Combine(root,"data-packs/survival.json"),
                                            Path.Combine(root,"data-packs/custom-example.json"));
@@ -69,8 +69,6 @@ static class Program {
             Check(action.Accepted&&after.Inventory["survival:water"]==before.Inventory["survival:water"]-1
                 &&after.Needs["demo:focus"]<=before.Needs["demo:focus"],"custom effect executed without rebuilding Core");
             Check(extra.ResourcesBalanced,"custom action respects resource ledger");
-            var invalid=extra.Execute(new ActionProposal(before.Id,"survival:drink",Item:"survival:nonexistent"));
-            // ‘drink’ may be valid regardless of a spurious item argument; explicitly invalid unknown action.
             var rejected=extra.Execute(new ActionProposal(before.Id,"unknown:illegal-action"));
             Check(!rejected.Accepted&&extra.ResourcesBalanced,"unknown action rejected atomically");
             var all=Run(custom,host,days:3);
