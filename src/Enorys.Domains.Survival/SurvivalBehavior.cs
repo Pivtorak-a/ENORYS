@@ -2,11 +2,17 @@ using Enorys.Abstractions;
 namespace Enorys.Domains.Survival;
 
 /// <summary>Example domain-specific decision plugin: none of these item names are in ENORYS Core.</summary>
-public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDecisionModule {
+public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDecisionModule, IWakePolicy {
     const string S="survival:";
     public string Id=>"survival:behavior-module";
     public string ModuleId=>Id;
-    public void Register(IModuleRegistry registry)=>registry.AddDecision(this);
+    public void Register(IModuleRegistry registry){registry.AddDecision(this);registry.AddWakePolicy(this);}
+    public int SleepTurns(AgentView a,ObservationPacket p,Decision d,ActionResult result){
+        if(!result.Accepted||p.Messages.Count>0||a.Evidence.Any(x=>x.Active))return 0;
+        if(d.Proposal.Kind=="survival:wait" && a.Health>65)return 1;
+        if(d.Proposal.Kind=="survival:sleep" && a.Health>55 && a.Needs.GetValueOrDefault("survival:thirst")<60)return 1;
+        return 0;
+    }
     static int I(AgentView a,string item)=>a.Inventory.GetValueOrDefault(S+item);
     static double N(AgentView a,string need)=>a.Needs.GetValueOrDefault(S+need)/100;
     static bool Source(ObservationPacket p,string item)=>p.SourcesKnown.GetValueOrDefault(S+item);
