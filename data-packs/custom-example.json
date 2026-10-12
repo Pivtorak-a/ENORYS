@@ -21,7 +21,7 @@
   "actions": [
     {
       "id": "drink-tea",
-      "itemId": "herbal-tea",
+      "itemId": "survival:water",
       "needId": "focus",
       "needDelta": -25
     }
