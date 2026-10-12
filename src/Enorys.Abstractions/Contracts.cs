@@ -20,7 +20,12 @@ public record AgentView(string Id,int Zone,int Group,bool Alive,
     IReadOnlyDictionary<string,double> Trust,IReadOnlyDictionary<string,int> Debts,
     IReadOnlyList<string> Nearby,IReadOnlyList<HelpRequest> Requests,
     IReadOnlySet<string> Acted,IReadOnlySet<string> Reported,
-    IReadOnlyList<RetractionRequest> PendingCorrections);
+    IReadOnlyList<RetractionRequest> PendingCorrections){
+    public bool HasEvidenceIndex {get;init;}
+    public IReadOnlyList<IndexedEvidenceGroup> IndexedEvidenceGroups {get;init;}=[];
+}
+public sealed record IndexedEvidenceGroup(string Incident,string Suspect,
+    IReadOnlyList<PrivateEvidence> Records);
 
 public record Traits(double Greed,double Generosity,double Norm,double Courage,double Curiosity,double Sociability);
 public record PrivateEvidence(string Root,string Incident,string Suspect,double LogLikelihood,
