@@ -1,8 +1,8 @@
 # ENORYS · Modular Cognitive Engine
 
-**Headless, modular, data-driven cognitive agent research engine, targeting C# / .NET 10.** Current experimental v0.5 includes a runnable C# world/agent loop, survival domain, plan persistence, socially transmitted evidence, and a validated external C# plugin and data-pack example.
+**Headless, modular, data-driven cognitive agent research engine, targeting C# / .NET 10.** Current experimental v0.6 includes a runnable C# world/agent loop, survival domain, plan persistence, socially transmitted evidence, and a validated external C# plugin and data-pack example.
 
-> **Status:** C# v0.5 engineering proof of concept, **not** a production SDK, complete Affective Cognitive Map, Godot game or validated psychological simulator. The existing JavaScript tools are independent reference demos.
+> **Status:** C# v0.6 engineering proof of concept, **not** a production SDK, complete Affective Cognitive Map, Godot game or validated psychological simulator. The existing JavaScript tools are independent reference demos.
 
 ### Run the C# engine
 
@@ -17,7 +17,7 @@ dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Relea
 
 **Source:** [Enorys.Abstractions](src/Enorys.Abstractions) · [Enorys.Core](src/Enorys.Core) · [Enorys.Domains.Survival](src/Enorys.Domains.Survival) · [External C# plugin](examples/Enorys.CustomBehavior) · [JSON Data Packs](data-packs/).
 
-**Measured:** 500 NPCs × 14 days × 3 turns/day = 21,000 decisions in ~303 ms median on a GitHub x64 Linux .NET 10 runner; process peak ~98 MB, short-lived allocation ~12.45 KB/turn. Read the [benchmark report](docs/NET-MIGRATION-BENCHMARK.md) for workload, CI data, GC counts and limitations. These values are **not** Godot FPS.
+**Historical v0.5 measurement:** 500 NPCs × 14 days × 3 turns/day = 21,000 decisions in ~303 ms median on a GitHub x64 Linux .NET 10 runner; process peak ~98 MB, short-lived allocation ~12.45 KB/turn. Read the [benchmark report](docs/NET-MIGRATION-BENCHMARK.md) for workload, CI data, GC counts and limitations. These values are **not** Godot FPS.
 
 ## v0.6 — Wake Scheduler and modular emotional cognition (experimental)
 
@@ -47,6 +47,14 @@ An independent native C library now benchmarks exact Noisy-OR causal inference a
 On Linux x64 (GCC `-O3`, .NET 10), 40,000 two-cause evaluations ran in **15.45 ms** with original C#, **6.66 ms** in optimized C#, and **4.87 ms** via native C/P-Invoke. Larger eight-cause evaluations showed smaller native gains. [Read the complete benchmark, numeric verification and caveats](docs/EXPERIMENT-006-C-VS-CSHARP.md).
 
 The C source is in [native/](native/), and the runnable comparison is in [benchmarks/Enorys.NativeMath/](benchmarks/Enorys.NativeMath/). Windows and macOS binary compatibility and speed are unverified.
+
+## C versus Zig versus Go: live NPC benchmarks
+
+[Experiment 007 — measured world-profile and language comparison](docs/EXPERIMENT-007-C-ZIG-GO-PROFILE.md) adds optional C/Zig/Go implementations of a single hot-path numeric choice operation, and compares them with C# over reproducible 24, 100 and 500-NPC worlds. All backends reproduce identical agent decision traces in the tested scenarios.
+
+**Result:** 500-NPC world: C# direct for loop ~185.4 ms, C# managed span **~181.9 ms**, C **~183.4 ms**, Zig **~182.1 ms**, Go **~189.6 ms** (median of 5 runs, shared Ubuntu runner). Only **~0.48%** of world time is the numeric argmax itself in a profiled run. Per-call native FFI is much slower for tiny vectors. This is **not** evidence for rewriting the whole engine in a native language. The default C# path now removes one per-decision LINQ iterator without any required native dependencies.
+
+Native builds and verification via [C/Zig/Go CI workflow](.github/workflows/c-zig-go-world.yml). The existing C# engine still requires none of these optional libraries.
 
 ## Legacy research demos (JavaScript)
 
