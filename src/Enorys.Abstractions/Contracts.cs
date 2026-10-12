@@ -80,6 +80,7 @@ public interface IModuleRegistry {
     void AddAppraisal(IAppraisalModule module);
     void AddWakePolicy(IWakePolicy policy);
     void AddAffectiveModule(IAffectiveModule module);
+    void AddBackgroundDeadline(IBackgroundDeadlinePolicy policy);
 }
 public interface IAppraisalModule {
     string ModuleId { get; }
@@ -111,4 +112,23 @@ public interface IAffectiveModule {
 public interface IChoiceKernel {
     string Name { get; }
     int ArgMax(ReadOnlySpan<double> scores);
+}
+
+/** Optional exact world-clock skipping capability. This must perform the same
+    scheduled day-boundary updates as repeated Advance() calls. */
+public interface IWorldFastForward {
+    void AdvanceSlots(int slots);
+}
+/** Non-destructive wake notifications: the world retains the actual messages
+    until Observe consumes them. Caller-provided buffer minimizes allocations. */
+public interface IPrivateWakeFeed {
+    void DrainWakeSignals(List<int> destination);
+}
+/** Independent plugin policy for background actors. A positive round count
+    schedules the actor's next cognitive turn; maxRounds is a safety ceiling.
+    No inference of strict semantic equivalence is implied. */
+public interface IBackgroundDeadlinePolicy {
+    string PolicyId {get;}
+    int NextWakeRounds(AgentView afterAction,ObservationPacket observations,
+        int roundsPerDay,int maxRounds);
 }
