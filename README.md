@@ -56,6 +56,16 @@ The C source is in [native/](native/), and the runnable comparison is in [benchm
 
 Native builds and verification via [C/Zig/Go CI workflow](.github/workflows/c-zig-go-world.yml). The existing C# engine still requires none of these optional libraries.
 
+## Experimental PulseGraph architecture — sparse, causal event scheduling
+
+[PulseGraph ADR-0004](docs/ADR-0004-PULSEGRAPH.md) explores a more unusual **event-driven cognition schedule**: don't scan every NPC's needs every tick. Instead, compute each signal's next relevant threshold crossing and wake an agent only when a deadline or a private observation arrives.
+
+The **standalone C# experiment** in [experiments/Enorys.PulseGraph](experiments/Enorys.PulseGraph) compared an exact sparse scheduler against a reference tick scan. In **54 matched seeded test cases**, action counts and ordered action-trace checksums agreed. On a GitHub CI runner, 5,000 NPC and nine signals took **192.60 ms by full scanning vs 29.31 ms by PulseGraph (6.57×)**. But a dense-observation case was **slower with PulseGraph** (53.07 vs 28.24 ms for 500 NPC), and the event queue allocated more memory.
+
+This is **NOT a drop-in replacement for ENORYS Core**: the proof tests deterministic threshold regulation, *not* the complete world, social cognition, ACM, or Godot. A future production architecture should combine sparse distant agents with dense ECS updates for active/high-interaction regions.
+
+Read the [complete benchmark protocol, negative results, modularity and integration gates](docs/EXPERIMENT-008-PULSEGRAPH-BENCHMARK.md). Run with `dotnet run --project experiments/Enorys.PulseGraph -c Release -- test` and `-- bench`.
+
 ## Legacy research demos (JavaScript)
 
 
