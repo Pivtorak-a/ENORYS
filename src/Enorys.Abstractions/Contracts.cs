@@ -66,6 +66,7 @@ public interface IDecisionContext {
     bool LodEnabled { get; }
     bool AuditLod { get; }
     bool HasAffect { get; }
+    int CognitiveTickStride {get;}
     double EmotionBias(AgentView agent,string actionKind,string? target,long tick);
 }
 public interface IFastDecisionModule {
@@ -80,6 +81,8 @@ public interface IModuleRegistry {
     void AddAppraisal(IAppraisalModule module);
     void AddWakePolicy(IWakePolicy policy);
     void AddAffectiveModule(IAffectiveModule module);
+    void AddBackgroundDeadline(IBackgroundDeadlinePolicy policy);
+    void AddCognitiveWakeSignal(ICognitiveWakeSignal signal);
 }
 public interface IAppraisalModule {
     string ModuleId { get; }
@@ -111,4 +114,36 @@ public interface IAffectiveModule {
 public interface IChoiceKernel {
     string Name { get; }
     int ArgMax(ReadOnlySpan<double> scores);
+}
+
+/** Optional exact world-clock skipping capability. This must perform the same
+    scheduled day-boundary updates as repeated Advance() calls. */
+public interface IWorldFastForward {
+    void AdvanceSlots(int slots);
+}
+/** Non-destructive wake notifications: the world retains the actual messages
+    until Observe consumes them. Caller-provided buffer minimizes allocations. */
+public interface IPrivateWakeFeed {
+    void DrainWakeSignals(List<int> destination);
+}
+/** Independent plugin policy for background actors. A positive round count
+    schedules the actor's next cognitive turn; maxRounds is a safety ceiling.
+    No inference of strict semantic equivalence is implied. */
+public interface IBackgroundDeadlinePolicy {
+    string PolicyId {get;}
+    int NextWakeRounds(AgentView afterAction,ObservationPacket observations,
+        int roundsPerDay,int maxRounds);
+}
+
+/** Optional trusted scenario stimuli deadline, so world fast-forward never skips
+    an external event that might awaken an otherwise dormant cognitive agent. */
+public interface IWorldScheduledStimuli {
+    long NextExternalStimulusTick {get;}
+}
+
+/** Optional cognitive-module signal. A module that cannot bound its next
+    significant change must return 1 (do not skip cognition). */
+public interface ICognitiveWakeSignal {
+    string SignalId {get;}
+    int MaximumSleepRounds(string agentId,long cognitiveTick,int maxRounds);
 }

@@ -1,0 +1,43 @@
+{
+  "namespace": "survival",
+  "version": "0.1.0",
+  "maxRounds": 9,
+  "thresholds": [
+    {
+      "id": "thirst",
+      "threshold": 68
+    },
+    {
+      "id": "hunger",
+      "threshold": 68
+    },
+    {
+      "id": "fatigue",
+      "threshold": 70
+    },
+    {
+      "id": "cold",
+      "threshold": 75
+    },
+    {
+      "id": "hygiene",
+      "threshold": 80
+    },
+    {
+      "id": "bladder",
+      "threshold": 72
+    },
+    {
+      "id": "safety",
+      "threshold": 80
+    },
+    {
+      "id": "belonging",
+      "threshold": 82
+    },
+    {
+      "id": "morale",
+      "threshold": 85
+    }
+  ]
+}
