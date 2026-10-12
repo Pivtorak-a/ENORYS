@@ -23,7 +23,7 @@ internal static class Program {
     }
     private sealed record Case(int Seed,int Agents,int Active,int Days,
         bool Sparse,int MaximumRounds,bool Affect,double Visibility,double Resources,
-        bool Trace=true);
+        bool Trace=true,bool Wheel=true);
     private sealed record Record(EngineResults Outcome,SurvivalWorld World,
         double Milliseconds,double AllocationMiB,double CurrentWorkingSetMiB,
         int ActiveEmotionEpisodes,int BackgroundEmotionEpisodes,
@@ -95,7 +95,8 @@ internal static class Program {
                 HybridActiveAgents:test.Sparse?test.Active:0,
                 BackgroundMaximumRounds:test.MaximumRounds,
                 BackgroundRoundsPerDay:3,
-                CaptureHistory:test.Trace,NormalizeCognitiveClock:true)).Run();
+                CaptureHistory:test.Trace,NormalizeCognitiveClock:true,
+                HybridUseTimingWheel:test.Wheel)).Run();
         sw.Stop();
         var allocationMiB=(GC.GetTotalAllocatedBytes(true)-allocated)/1048576.0;
         int activeEmotion=0,backgroundEmotion=0;
@@ -109,7 +110,7 @@ internal static class Program {
         return new Record(outcome,world,sw.Elapsed.TotalMilliseconds,allocationMiB,
             Process.GetCurrentProcess().WorkingSet64/1048576.0,
             activeEmotion,backgroundEmotion,
-            test.Sparse?"pulse":"full",test.Seed);
+            test.Sparse?(test.Wheel?"pulse-wheel":"pulse-heap"):"full",test.Seed);
     }
     private static int Tests(string root,DomainRegistry domain){
         try{
@@ -139,7 +140,9 @@ internal static class Program {
                 var scenario=new Case(seed,24,8,4,false,1,true,.16,.75);
                 var baseline=Run(root,domain,scenario);
                 var allAwake=Run(root,domain,scenario with{Sparse=true});
-                Check(baseline.Outcome.TraceHash==allAwake.Outcome.TraceHash,
+                var allAwakeHeap=Run(root,domain,scenario with{Sparse=true,Wheel=false});
+                Check(baseline.Outcome.TraceHash==allAwake.Outcome.TraceHash &&
+                      baseline.Outcome.TraceHash==allAwakeHeap.Outcome.TraceHash,
                     "pulse maxRounds=1 exactly replays all actions, seed "+seed);
                 Check(baseline.Outcome.World.AverageHealth==allAwake.Outcome.World.AverageHealth &&
                       baseline.Outcome.World.ResourcesBalanced&&allAwake.Outcome.World.ResourcesBalanced,
@@ -159,6 +162,9 @@ internal static class Program {
                   hybrid.Outcome.AffectMessagesProcessed>0 &&
                   hybrid.BackgroundEmotionEpisodes>0,
                 "background wake updates private beliefs and independent ACM");
+            var heapVersion=Run(root,domain,new Case(42,24,8,6,true,9,true,.10,.8,Wheel:false));
+            Check(hybrid.Outcome.TraceHash==heapVersion.Outcome.TraceHash,
+                "heap and timing-wheel produce same ordered actions with private wakeups");
             var repeat=Run(root,domain,new Case(42,24,8,6,true,9,true,.10,.8));
             Check(hybrid.Outcome.TraceHash==repeat.Outcome.TraceHash,
                 "hybrid pulse replay deterministic with emotion and memory");
@@ -186,9 +192,10 @@ internal static class Program {
                 ("sparse-social",.025,.70,7),
                 ("denser-social",.18,.80,7)}){
                 for(int seed=100;seed<103;seed++){
-                    foreach(bool pulse in new[]{false,true}){
+                    foreach(int variant in new[]{0,1,2}){
                         var result=Run(root,domain,new Case(seed,Active+Background,Active,
-                            scenario.days,pulse,9,true,scenario.visibility,scenario.resources,false));
+                            scenario.days,variant!=0,9,true,scenario.visibility,scenario.resources,
+                            Trace:false,Wheel:variant!=2));
                         if(!result.Outcome.World.ResourcesBalanced ||
                            result.Outcome.World.Turns!=(Active+Background)*scenario.days*3)
                             throw new InvalidOperationException("World corrupt");
