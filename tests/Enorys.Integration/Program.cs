@@ -132,6 +132,30 @@ static class Program {
             }
             Check(true,"40 varied scarcity and replay seeds");
 
+
+            var viewWorld=new SurvivalWorld(d,new SurvivalConfig(73,24,2));
+            var oldView=viewWorld.GetPrivateAgent(0);
+            int oldWater=oldView.Inventory.GetValueOrDefault("survival:water");
+            var drinkResult=viewWorld.Execute(new ActionProposal(oldView.Id,"survival:drink"));
+            var currentView=viewWorld.GetPrivateAgent(0);
+            Check(drinkResult.Accepted && oldView.Inventory["survival:water"]==oldWater
+                && currentView.Inventory["survival:water"]==oldWater-1,
+                "immutable private snapshots retain old values after world mutation");
+            var oldDepot=viewWorld.Observe(0);
+            int oldSupply=oldDepot.Depot.GetValueOrDefault("survival:water");
+            var takeResult=viewWorld.Execute(new ActionProposal(oldView.Id,"survival:take",
+                Item:"survival:water"));
+            var newDepot=viewWorld.Observe(0);
+            Check(takeResult.Accepted&&oldDepot.Depot["survival:water"]==oldSupply
+                &&newDepot.Depot["survival:water"]==oldSupply-1,
+                "depot snapshot invalidated without altering previously issued observations");
+            Check(!viewWorld.HasPendingObservation(4),"inbox initially empty");
+            var helpResult=viewWorld.Execute(new ActionProposal("A001","survival:ask",
+                Item:"survival:water",Target:"A005"));
+            Check(helpResult.Accepted&&viewWorld.HasPendingObservation(4),
+                "world message signals wake without consuming inbox");
+            Check(viewWorld.Observe(4).Messages.Any(m=>m.Type=="request") &&
+                !viewWorld.HasPendingObservation(4),"woken NPC receives the message exactly once");
             var wake=new WakeScheduler(3);
             wake.Schedule(1,1,2);
             Check(!wake.ShouldRun(1,4,false),"timed sleep skips routine cognition");
