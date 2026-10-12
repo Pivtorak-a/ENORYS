@@ -3,6 +3,9 @@ namespace Enorys.Domains.Survival;
 
 /// <summary>Example domain-specific decision plugin: none of these item names are in ENORYS Core.</summary>
 public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDecisionModule, IWakePolicy {
+    private readonly IChoiceKernel? choiceKernel;
+    public SurvivalBehavior(IChoiceKernel? choiceKernel=null){this.choiceKernel=choiceKernel;}
+
     const string S="survival:";
     public string Id=>"survival:behavior-module";
     public string ModuleId=>Id;
@@ -96,9 +99,23 @@ public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDeci
                         "tell witness",target:recipient,incident:s.Incident,root:s.Root,suspect:s.Suspect,lr:s.LogLikelihood));
             }
         }
+        if(choiceKernel!=null){
+            if(candidates.Count>64)throw new InvalidOperationException("Candidate buffer exceeded.");
+            Span<double> values=stackalloc double[64];
+            for(int i=0;i<candidates.Count;i++){
+                var c=candidates[i];
+                values[i]=c.Utility+ctx.EmotionBias(a,c.Proposal.Kind,c.Proposal.Target,p.Tick);
+            }
+            int winner=choiceKernel.ArgMax(values[..candidates.Count]);
+            if(winner<0||winner>=candidates.Count)
+                throw new InvalidOperationException("Invalid backend choice.");
+            var result=candidates[winner];
+            return new Decision(result.Proposal,"deliberate",result.Reason,candidates.Count,values[winner]);
+        }
         var selected=candidates[0];
         double best=selected.Utility+ctx.EmotionBias(a,selected.Proposal.Kind,selected.Proposal.Target,p.Tick);
-        foreach(var x in candidates.Skip(1)){
+        for(int i=1;i<candidates.Count;i++){
+            var x=candidates[i];
             double score=x.Utility+ctx.EmotionBias(a,x.Proposal.Kind,x.Proposal.Target,p.Tick);
             if(score>best){selected=x;best=score;}
         }
