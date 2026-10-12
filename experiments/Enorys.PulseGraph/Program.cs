@@ -116,6 +116,7 @@ internal static class Program {
                 Benchmark(5000,ticks,.3,rules,42,repeats);
                 Benchmark(20000,ticks,.3,rules,42,repeats);
                 Benchmark(5000,ticks,12.0,rules,42,repeats);
+                Benchmark(500,ticks,300.0,rules,42,repeats);
                 Benchmark(5000,ticks,.3,extended,42,repeats);
                 return 0;
             }
