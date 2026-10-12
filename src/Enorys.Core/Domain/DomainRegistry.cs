@@ -39,7 +39,7 @@ public sealed class DomainRegistry {
             if(string.IsNullOrWhiteSpace(y.Category)||!_items.TryAdd(y.Id,y))throw new InvalidDataException("Invalid/duplicate item "+y.Id);
         }
         foreach(var x in pack.Recipes){
-            var y=x with {Id=Norm(x.Id),Inputs=x.Inputs.ToDictionary(k=>Norm(k.Key),v=>v.Value),Outputs:x.Outputs.ToDictionary(k=>Norm(k.Key),v=>v.Value)};CheckId(y.Id);
+            var y=x with {Id=Norm(x.Id),Inputs=x.Inputs.ToDictionary(k=>Norm(k.Key),v=>v.Value),Outputs=x.Outputs.ToDictionary(k=>Norm(k.Key),v=>v.Value)};CheckId(y.Id);
             if(y.Inputs.Count==0||y.Outputs.Count==0||y.Inputs.Values.Any(v=>v<=0)||y.Outputs.Values.Any(v=>v<=0)||!_recipes.TryAdd(y.Id,y))throw new InvalidDataException("Invalid/duplicate recipe "+y.Id);
         }
         foreach(var x in pack.Goals){
