@@ -1,0 +1,23 @@
+name: PulseGraph event-driven cognition
+on:
+  push:
+    branches: [experiment/v08-pulsegraph-discrete-events]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  prove-and-benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build experimental PulseGraph scheduler
+        run: dotnet build experiments/Enorys.PulseGraph/Enorys.PulseGraph.csproj -c Release
+      - name: Prove identical action histories under sparse and dense stimuli
+        run: dotnet run --project experiments/Enorys.PulseGraph/Enorys.PulseGraph.csproj -c Release --no-build -- test
+      - name: Benchmark 500 to 20000 NPC and user-defined modules
+        run: dotnet run --project experiments/Enorys.PulseGraph/Enorys.PulseGraph.csproj -c Release --no-build -- bench

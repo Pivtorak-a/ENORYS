@@ -1,0 +1,69 @@
+{
+  "namespace": "survival",
+  "version": "0.1.0",
+  "needs": [
+    {
+      "id": "thirst",
+      "rate": 3,
+      "threshold": 780,
+      "relief": 600,
+      "coupledDelta": 10
+    },
+    {
+      "id": "hunger",
+      "rate": 2,
+      "threshold": 820,
+      "relief": 510,
+      "coupledDelta": 15
+    },
+    {
+      "id": "fatigue",
+      "rate": 2,
+      "threshold": 860,
+      "relief": 550,
+      "coupledDelta": 4
+    },
+    {
+      "id": "cold",
+      "rate": 1,
+      "threshold": 750,
+      "relief": 480,
+      "coupledDelta": 8
+    },
+    {
+      "id": "safety",
+      "rate": 1,
+      "threshold": 810,
+      "relief": 380,
+      "coupledDelta": 6
+    },
+    {
+      "id": "belonging",
+      "rate": 1,
+      "threshold": 850,
+      "relief": 450,
+      "coupledDelta": 15
+    },
+    {
+      "id": "hygiene",
+      "rate": 1,
+      "threshold": 820,
+      "relief": 500,
+      "coupledDelta": 10
+    },
+    {
+      "id": "morale",
+      "rate": 1,
+      "threshold": 840,
+      "relief": 500,
+      "coupledDelta": 20
+    },
+    {
+      "id": "bladder",
+      "rate": 2,
+      "threshold": 800,
+      "relief": 650,
+      "coupledDelta": 6
+    }
+  ]
+}
