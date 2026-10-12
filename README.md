@@ -1,8 +1,30 @@
-# ENORYS · Cognitive Sandbox
+# ENORYS · Modular Cognitive Engine
+
+**Headless, modular, data-driven cognitive agent research engine, targeting C# / .NET 10.** Current experimental v0.5 includes a runnable C# world/agent loop, survival domain, plan persistence, socially transmitted evidence, and a validated external C# plugin and data-pack example.
+
+> **Status:** C# v0.5 engineering proof of concept, **not** a production SDK, complete Affective Cognitive Map, Godot game or validated psychological simulator. The existing JavaScript tools are independent reference demos.
+
+### Run the C# engine
+
+Requires the **.NET 10 SDK**. From the repository root:
+
+```bash
+dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release -- test
+dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release -- bench
+# Print a reproducible NPC event story as JSON:
+dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release -- simulate 42 24 14
+```
+
+**Source:** [Enorys.Abstractions](src/Enorys.Abstractions) · [Enorys.Core](src/Enorys.Core) · [Enorys.Domains.Survival](src/Enorys.Domains.Survival) · [External C# plugin](examples/Enorys.CustomBehavior) · [JSON Data Packs](data-packs/).
+
+**Measured:** 500 NPCs × 14 days × 3 turns/day = 21,000 decisions in ~303 ms median on a GitHub x64 Linux .NET 10 runner; process peak ~98 MB, short-lived allocation ~12.45 KB/turn. Read the [benchmark report](docs/NET-MIGRATION-BENCHMARK.md) for workload, CI data, GC counts and limitations. These values are **not** Godot FPS.
+
+## Legacy research demos (JavaScript)
+
 
 **Experimental cognitive architecture for autonomous agents.** A small but runnable browser sandbox illustrating how partial observations, remembered events, social reports and explainable utility-based decisions can produce different histories from the same initial agents.
 
-> **Status: interactive demo / early research.** This is **not** the full NOEMYN v0.1.1 specification, a C# SDK, or a validated model of psychology. The planned C# CPU-first implementation remains future work.
+> **Legacy demo status:** the browser sandbox remains separate from the C# kernel; its scenario-specific algorithms are not the general-purpose plugin API.
 
 ## Try the demo
 
@@ -54,7 +76,7 @@ Read [ADR-0003 — extensible modules and user-authored data](docs/ADR-0003-EXTE
 
 ## What the prototype does NOT do
 
-No natural language generation, LLM integration, lying, planner, persistence, learning, Godot adapter, validated emotions, or high-fidelity cognition. Rules and trait weights are **toy experimental defaults**, not psychologically calibrated. An audit log is available to the UI but never passed into an agent's decision function.
+This **legacy browser demo** has no natural language generation, LLM integration, persistence, or Godot adapter; it is not a high-fidelity cognitive simulator. The newer C# engine **does** include an experimental planner and memories, but not the proposed full Affective Cognitive Map. Rules and trait weights are **toy experimental defaults**, not psychologically calibrated. An audit log is available to the UI but never passed into an agent's decision function.
 
 ## Architecture
 
