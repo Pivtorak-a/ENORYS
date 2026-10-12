@@ -16,6 +16,7 @@ public sealed class CausalGraphModule : IEnorysModule,ICausalGraphModule {
         public readonly Queue<string> Roots=new();
         public readonly Dictionary<string,List<string>> RootIndex=new(StringComparer.Ordinal);
         public readonly Dictionary<string,List<string>> GoalIndex=new(StringComparer.Ordinal);
+        public readonly Dictionary<string,double> GoalDecay=new(StringComparer.Ordinal);
         public readonly Queue<string> Decisions=new();
         public long Revision,Recomputed,Unchanged,Invalidated;
     }
@@ -76,6 +77,7 @@ public sealed class CausalGraphModule : IEnorysModule,ICausalGraphModule {
     private static void ForgetNode(State state,string id){
         if(!state.Nodes.Remove(id,out var node))return;
         state.Invalidated++;state.Revision++;
+        if(node.Stage=="goal")state.GoalDecay.Remove(id);
         if(node.Stage=="goal"&&node.ActionKind!=null&&
             state.GoalIndex.TryGetValue(node.ActionKind,out var goals))
             goals.Remove(id);
@@ -162,6 +164,7 @@ public sealed class CausalGraphModule : IEnorysModule,ICausalGraphModule {
                 string goalId=Identity(actor.Id,root,rule.Id,"goal");
                 Upsert(state,new CausalNode(goalId,actor.Id,root,"goal",
                     subject,strength,true,cognitiveTick,rule.Action));
+                state.GoalDecay[goalId]=rule.Decay;
                 AddEdge(state,parent,goalId,"motivates");
             }
             Prune(state);
@@ -174,14 +177,9 @@ public sealed class CausalGraphModule : IEnorysModule,ICausalGraphModule {
         foreach(string id in ids){
             var goal=state.Nodes[id];
             if(!goal.Active||(target!=null&&goal.Subject!=target))continue;
-            var ruleId=state.Edges.FirstOrDefault(e=>e.To==id)?.From;
-            // Goal strengths are fixed at the causal appraisal time; lazy decay
-            // accounts for time without rewriting otherwise clean graph nodes.
-            double decay=0.012;
-            if(ruleId!=null){
-                // Stable rule ID is encoded in goal key; no hidden data lookup.
-                // Use conservative fixed graph decay for the first implementation.
-            }
+            // Definition-specific lazy decay; updating the clock never
+            // invalidates or rebuilds otherwise unchanged causal nodes.
+            double decay=state.GoalDecay[id];
             score+=goal.Strength*Math.Exp(-decay*Math.Max(0,tick-goal.Tick));
         }
         return Math.Clamp(score*biasScale,0,.5);
