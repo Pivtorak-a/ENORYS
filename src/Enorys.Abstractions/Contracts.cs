@@ -76,6 +76,7 @@ public interface IEnorysModule {
 public interface IModuleRegistry {
     void AddDecision(IDecisionModule module);
     void AddAppraisal(IAppraisalModule module);
+    void AddWakePolicy(IWakePolicy policy);
 }
 public interface IAppraisalModule {
     string ModuleId { get; }
