@@ -1,0 +1,25 @@
+name: Causal Graph Stage 11
+on:
+  push:
+    branches: [feature/v11-causal-graph-godot-bridge]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  causal-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build separate causal module and actual SurvivalWorld
+        run: dotnet build benchmarks/Enorys.CausalLab/Enorys.CausalLab.csproj -c Release
+      - name: Test root dedup, private facts, retraction, causal trace and actual NPC integration
+        run: dotnet run --project benchmarks/Enorys.CausalLab -c Release --no-build -- test
+      - name: Compare real 24 and 500 agent worlds, compute selective graph invalidation cost
+        run: dotnet run --project benchmarks/Enorys.CausalLab -c Release --no-build -- bench
+      - name: Regression - legacy C# integration tests
+        run: dotnet run --project tests/Enorys.Integration -c Release -- test

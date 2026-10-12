@@ -6,6 +6,14 @@ namespace Enorys.Core.Modules;
 public sealed class ModuleHost : IModuleRegistry {
     private readonly Dictionary<string, IDecisionModule> _decisions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IAppraisalModule> _appraisals = new(StringComparer.Ordinal);
+    private readonly List<ICausalGraphModule> _causalGraphs=new();
+    public IReadOnlyList<ICausalGraphModule> CausalGraphs=>_causalGraphs;
+    public void AddCausalGraph(ICausalGraphModule module){
+        if(string.IsNullOrWhiteSpace(module.ModuleId)||
+           _causalGraphs.Any(x=>x.ModuleId==module.ModuleId))
+            throw new InvalidOperationException("Duplicate/invalid causal graph module");
+        _causalGraphs.Add(module);
+    }
     private readonly List<ICognitiveWakeSignal> _wakeSignals=new();
     public IReadOnlyList<ICognitiveWakeSignal> CognitiveWakeSignals=>_wakeSignals;
     public void AddCognitiveWakeSignal(ICognitiveWakeSignal signal){

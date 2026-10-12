@@ -71,6 +71,8 @@ public interface IDecisionContext {
     bool LodEnabled { get; }
     bool AuditLod { get; }
     bool HasAffect { get; }
+    bool HasCausalGraph {get;}
+    double CausalBias(AgentView agent,string actionKind,string? target,long tick);
     bool IsAffectNeutral(AgentView agent,long tick);
     bool NoPlanCanActivate(AgentView agent);
     int CognitiveTickStride {get;}
@@ -90,6 +92,7 @@ public interface IModuleRegistry {
     void AddAffectiveModule(IAffectiveModule module);
     void AddBackgroundDeadline(IBackgroundDeadlinePolicy policy);
     void AddCognitiveWakeSignal(ICognitiveWakeSignal signal);
+    void AddCausalGraph(ICausalGraphModule module);
 }
 public interface IAppraisalModule {
     string ModuleId { get; }
@@ -168,3 +171,24 @@ public interface ICertifiedDecisionModule {
 public interface IAffectNeutrality {
     bool IsNeutral(string agentId,long cognitiveTick);
 }
+
+/** Actor-private cognitive causal provenance; never contains World Authority truth. */
+public sealed record CausalNode(string Id,string AgentId,string Root,string Stage,
+    string Subject,double Strength,bool Active,long Tick,string? ActionKind=null);
+public sealed record CausalEdge(string From,string To,string Relation);
+public sealed record CausalSnapshot(string AgentId,long Revision,
+    IReadOnlyList<CausalNode> Nodes,IReadOnlyList<CausalEdge> Edges,
+    long Recomputed,long Unchanged,long Invalidated);
+public interface ICausalGraphModule {
+    string ModuleId {get;}
+    void Observe(AgentView privateAgent,ObservationPacket observations,
+        IReadOnlyList<EmotionActivation> privateAffect,long cognitiveTick);
+    void RecordDecision(AgentView privateAgent,Decision decision,
+        ActionResult outcome,long cognitiveTick);
+    double ActionBias(AgentView privateAgent,string actionKind,string? target,long cognitiveTick);
+    CausalSnapshot Inspect(string agentId);
+    CausalExplanation Explain(string agentId,string decisionNodeId);
+}
+public sealed record CausalExplanation(string AgentId,string DecisionNodeId,
+    IReadOnlyList<CausalNode> Causes,IReadOnlyList<CausalEdge> Links,bool ReachedObservation);
+
