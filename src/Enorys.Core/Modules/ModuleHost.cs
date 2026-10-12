@@ -6,6 +6,13 @@ namespace Enorys.Core.Modules;
 public sealed class ModuleHost : IModuleRegistry {
     private readonly Dictionary<string, IDecisionModule> _decisions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IAppraisalModule> _appraisals = new(StringComparer.Ordinal);
+    private readonly List<ICognitiveWakeSignal> _wakeSignals=new();
+    public IReadOnlyList<ICognitiveWakeSignal> CognitiveWakeSignals=>_wakeSignals;
+    public void AddCognitiveWakeSignal(ICognitiveWakeSignal signal){
+        if(_wakeSignals.Any(x=>x.SignalId==signal.SignalId))
+            throw new InvalidOperationException("Duplicate cognitive wake contributor");
+        _wakeSignals.Add(signal);
+    }
     private readonly List<IWakePolicy> _wakePolicies=new();
     private IBackgroundDeadlinePolicy? _backgroundDeadline;
     public IBackgroundDeadlinePolicy? BackgroundDeadline=>_backgroundDeadline;
