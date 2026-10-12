@@ -128,7 +128,9 @@ public sealed class Engine {
             Evidence=state.Evidence,Trust=state.Trust,Debts=state.Debts,
             Requests=state.Requests,Nearby=packet.Nearby,Acted=state.Acted,
             Reported=state.Reported,PendingCorrections=state.Corrections,
-            PlanGoal=mind.Plan?.Goal
+            PlanGoal=mind.Plan?.Goal,
+            HasEvidenceIndex=true,
+            IndexedEvidenceGroups=state.IndexedEvidenceGroups
         };
     }
     public EngineResults Run(){
