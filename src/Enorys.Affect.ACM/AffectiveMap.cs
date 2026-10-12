@@ -81,6 +81,13 @@ public sealed class AffectiveMap : IEnorysModule, IAffectiveModule {
             }
         }
     }
+    public void ObserveOwnAction(AgentView agent,ActionProposal proposal,long tick){
+        // Retracting an accusation can evoke self-directed guilt; it does not
+        // prove the subject was objectively innocent.
+        if(proposal.Kind=="survival:retract" && proposal.Target!=null && proposal.Root!=null)
+            Impulse(agent.Id,"guilt",proposal.Target,"self-retract:"+proposal.Root,tick,
+                .2+.6*agent.Personality.Norm);
+    }
     private void Impulse(string agent,string kind,string target,string root,long tick,double amount){
         var id=definitions.Keys.FirstOrDefault(x=>x.EndsWith(":"+kind,StringComparison.Ordinal));
         if(id==null)return;
