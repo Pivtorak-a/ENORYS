@@ -17,7 +17,7 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Build certified C# cognitive engine
         run: dotnet build benchmarks/Enorys.HybridSurvival/Enorys.HybridSurvival.csproj -c Release
-      - name: Verify 48 complete world histories and independent shadow proof audits
+      - name: Verify 97 complete-world audits including 5500 agents
         run: dotnet run --project benchmarks/Enorys.HybridSurvival -c Release --no-build -- cert-test
       - name: Compare 500 and 5500 NPC whole-world CPU and allocation
         run: dotnet run --project benchmarks/Enorys.HybridSurvival -c Release --no-build -- cert-bench
