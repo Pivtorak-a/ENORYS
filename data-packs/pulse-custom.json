@@ -1,0 +1,20 @@
+{
+  "namespace": "custom",
+  "version": "0.1.0",
+  "needs": [
+    {
+      "id": "radiation",
+      "rate": 1,
+      "threshold": 900,
+      "relief": 500,
+      "coupledDelta": 5
+    },
+    {
+      "id": "curiosity",
+      "rate": 1,
+      "threshold": 830,
+      "relief": 350,
+      "coupledDelta": 0
+    }
+  ]
+}
