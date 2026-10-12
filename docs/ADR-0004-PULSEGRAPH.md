@@ -2,6 +2,9 @@
 
 **Status:** Experimental proof in C#/.NET 10. **Not yet the primary ENORYS runtime.**
 **Date:** 2026-10-12
+
+**Follow-up:** [ADR-0005 — optional hybrid in actual SurvivalWorld](ADR-0005-HYBRID-SURVIVAL.md) and [Experiment 009](EXPERIMENT-009-HYBRID-SURVIVAL.md) verify a real 500-active/5,000-background integration. The standalone 6.57× scheduler acceleration **did not generalize** to the full-world, quality-sensitive benchmark. The hybrid remains opt-in, not the default engine.
+
 **References:** [ADR-0001](ADR-0001-ARCHITECTURE.md), [ADR-0002](ADR-0002-AFFECTIVE-COGNITIVE-MAP.md), [ADR-0003](ADR-0003-EXTENSIBLE-MODULES.md).
 
 ## Decision being tested
