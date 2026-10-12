@@ -31,7 +31,7 @@ public static class Packs {
 public sealed record Stimulus(int Tick,int Agent,int Signal,int Delta,string Root);
 public static class Stimuli {
     public static Stimulus[] Generate(int seed,int agents,int ticks,int signalCount,double perAgent){
-        if(perAgent<0||perAgent>100)throw new ArgumentOutOfRangeException(nameof(perAgent));
+        if(perAgent<0||perAgent>1000)throw new ArgumentOutOfRangeException(nameof(perAgent));
         int count=(int)Math.Round(perAgent*agents);
         var rng=new Random(seed^0x5EED03);
         var records=new Stimulus[count];
