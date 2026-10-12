@@ -7,12 +7,14 @@ public sealed class DomainRegistry {
     private readonly Dictionary<string,ItemDefinition> _items=new(StringComparer.Ordinal);
     private readonly Dictionary<string,RecipeDefinition> _recipes=new(StringComparer.Ordinal);
     private readonly Dictionary<string,GoalDefinition> _goals=new(StringComparer.Ordinal);
+    private readonly Dictionary<string,SourceDefinition> _sources=new(StringComparer.Ordinal);
     private readonly Dictionary<string,ActionDefinition> _actions=new(StringComparer.Ordinal);
     public IReadOnlyDictionary<string,NeedDefinition> Needs=>_needs;
     public IReadOnlyDictionary<string,ItemDefinition> Items=>_items;
     public IReadOnlyDictionary<string,RecipeDefinition> Recipes=>_recipes;
     public IReadOnlyDictionary<string,GoalDefinition> Goals=>_goals;
     public IReadOnlyDictionary<string,ActionDefinition> Actions=>_actions;
+    public IReadOnlyDictionary<string,SourceDefinition> Sources=>_sources;
     private static readonly JsonSerializerOptions Options = new(){PropertyNameCaseInsensitive=true};
 
     public static DomainRegistry Load(params string[] paths){
@@ -44,6 +46,10 @@ public sealed class DomainRegistry {
             var y=x with {Id=Norm(x.Id),NeedId=Norm(x.NeedId),ItemId=Norm(x.ItemId),UseAction=Norm(x.UseAction)};
             if(y.Threshold is <0 or >100||!double.IsFinite(y.Threshold)||!_goals.TryAdd(y.Id,y))throw new InvalidDataException("Invalid/duplicate goal "+y.Id);
         }
+        foreach(var x in pack.Sources){
+            var y=x with {ItemId=Norm(x.ItemId),ActionId=Norm(x.ActionId)};
+            if(!_sources.TryAdd(y.ItemId,y))throw new InvalidDataException("Duplicate source for "+y.ItemId);
+        }
         foreach(var x in pack.Actions){
             var y=x with {Id=Norm(x.Id),ItemId=Norm(x.ItemId),NeedId=Norm(x.NeedId)};
             if(!double.IsFinite(y.NeedDelta)||!_actions.TryAdd(y.Id,y))throw new InvalidDataException("Invalid/duplicate action "+y.Id);
@@ -53,6 +59,8 @@ public sealed class DomainRegistry {
         foreach(var x in _recipes.Values)
           foreach(var k in x.Inputs.Keys.Concat(x.Outputs.Keys))
             if(!_items.ContainsKey(k))throw new InvalidDataException("Unknown item "+k);
+        foreach(var x in _sources.Values)
+          if(!_items.ContainsKey(x.ItemId))throw new InvalidDataException("Unknown source item "+x.ItemId);
         foreach(var x in _actions.Values)
           if(!_items.ContainsKey(x.ItemId)||!_needs.ContainsKey(x.NeedId))throw new InvalidDataException("Unknown action reference "+x.Id);
         foreach(var x in _goals.Values)
