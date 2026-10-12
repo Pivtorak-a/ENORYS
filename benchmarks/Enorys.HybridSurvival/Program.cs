@@ -248,7 +248,7 @@ internal static class Program {
             foreach(bool socialDensity in new[]{false,true}){
                 var setup=new Case(seed,population,Math.Min(8,population/2),
                     Days:6,Sparse:false,MaximumRounds:1,
-                    Affect:affect,Visibility:socialDensity?.3:.025,Resources:.7,
+                    Affect:affect,Visibility:socialDensity ? .3 : .025,Resources:.7,
                     Trace:true);
                 var full=Run(root,domain,setup);
                 // Full reference policy runs alongside strict proof validation.
