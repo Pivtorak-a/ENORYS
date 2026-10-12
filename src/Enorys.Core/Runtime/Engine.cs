@@ -20,6 +20,7 @@ public sealed class Engine {
     private readonly EngineOptions options;
     private readonly WakeScheduler? scheduler;
     private readonly IWakePolicy? wakePolicy;
+    private readonly IReadOnlyList<IAffectiveModule> affects;
     private long automatic,deliberate,candidateChecks,decisionTicks;
     private int plansCompleted,plansAbandoned,divergences;
     private readonly List<string> history=new();
@@ -29,6 +30,11 @@ public sealed class Engine {
         public bool SocialEnabled=>engine.options.Social;
         public bool LodEnabled=>engine.options.CognitiveLod;
         public bool AuditLod=>engine.options.AuditLod;
+        public bool HasAffect=>engine.affects.Count>0;
+        public double EmotionBias(AgentView agent,string actionKind,string? target,long tick){
+            double sum=0;foreach(var module in engine.affects)sum+=module.ActionBias(agent,actionKind,target,tick);
+            return Math.Clamp(sum,-1,1);
+        }
         public ActionProposal? PlannedStep(AgentView a,ObservationPacket obs){
             if(!PlanningEnabled)return null;
             if(mind.Plan is { Finished:true })mind.Plan=null;
@@ -52,6 +58,7 @@ public sealed class Engine {
         decision=host.Decisions.FirstOrDefault()??throw new InvalidOperationException("No decision module installed");
         minds=Enumerable.Range(0,world.AgentCount).Select(_=>new AgentMind()).ToArray();
         wakePolicy=host.WakePolicies.FirstOrDefault();
+        affects=host.AffectiveModules;
         if(options.EventScheduling && wakePolicy!=null)scheduler=new WakeScheduler(world.AgentCount);
     }
     private AgentView PrivateSnapshot(AgentView baseView,ObservationPacket packet,AgentMind mind) {
@@ -87,6 +94,7 @@ public sealed class Engine {
             var obs=world.Observe(index);
             mind.Ingest(obs);
             var actor=PrivateSnapshot(world.GetPrivateAgent(index),obs,mind);
+            if(obs.Messages.Count>0)foreach(var affect in affects)affect.Receive(actor,obs);
             var ctx=new Context(this,mind);
             var before=System.Diagnostics.Stopwatch.GetTimestamp();
             Enorys.Abstractions.Decision choice;
