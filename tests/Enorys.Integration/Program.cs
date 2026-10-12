@@ -20,6 +20,8 @@ static class Program {
             "simulate"=>Simulate(domain,host,args),
             "bench-scheduler"=>BenchScheduler(domain,host),
             "bench-acm"=>BenchAcm(root,domain),
+            "profile"=>Profile(domain),
+            "compare-native"=>CompareNative(domain),
             "test"=>Tests(root,domain,host),
             _=>Help()
         };
@@ -238,6 +240,94 @@ static class Program {
     }
 
 
+    static int Profile(DomainRegistry domain){
+        Console.WriteLine("PROFILE_ENV "+JsonSerializer.Serialize(new{
+            dotnet=Environment.Version.ToString(),os=System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+            cpus=Environment.ProcessorCount,agents=500,days=14,turnsPerDay=3}));
+        for(int seed=200;seed<205;seed++){
+            var host=new ModuleHost();host.Install(new SurvivalBehavior());
+            var baseWorld=new SurvivalWorld(domain,new SurvivalConfig(seed,500,14,3,.55));
+            var world=new TimedWorld(baseWorld);
+            GC.Collect();GC.WaitForPendingFinalizers();GC.Collect();
+            long allocation=GC.GetTotalAllocatedBytes(true);
+            var sw=Stopwatch.StartNew();
+            var outcome=new Engine(world,domain,host,new EngineOptions(CognitiveLod:false)).Run();
+            sw.Stop();
+            if(!outcome.World.ResourcesBalanced)throw new Exception("Invalid resource ledger");
+            static double Ms(long ticks)=>ticks*1000.0/Stopwatch.Frequency;
+            double choice=Ms(outcome.ElapsedDecisionTicks);
+            double view=Ms(world.ViewTicks),observe=Ms(world.ObservationTicks);
+            double execute=Ms(world.ExecutionTicks),advance=Ms(world.AdvanceTicks);
+            double alive=Ms(world.AliveTicks);
+            var entry=new {seed,wallMs=sw.Elapsed.TotalMilliseconds,
+                choiceMs=choice,viewMs=view,observeMs=observe,executeMs=execute,
+                advanceMs=advance,aliveMs=alive,
+                remainingEngineMs=sw.Elapsed.TotalMilliseconds-choice-view-observe-execute-advance-alive,
+                allocatedBytesPerTurn=(GC.GetTotalAllocatedBytes(true)-allocation)/(double)outcome.World.Turns,
+                decisions=outcome.Deliberate,checks=outcome.CandidateChecks,
+                resourceBalanced=outcome.World.ResourcesBalanced};
+            Console.WriteLine("PROFILE_RESULT "+JsonSerializer.Serialize(entry));
+        }
+        return 0;
+    }
+    static int CompareNative(DomainRegistry domain){
+        IChoiceKernel[] backends=[new ManagedSpanChoice(),new NativeChoice("C"),
+            new NativeChoice("Zig"),new NativeChoice("Go")];
+        ReadOnlySpan<double> sample=[-2.0,4.0,4.0,0.4];
+        foreach(var backend in backends){
+            if(backend.ArgMax(sample)!=1)throw new Exception("Tie handling mismatch "+backend.Name);
+            if(backend.ArgMax([-2.0,-3.0])!=0)throw new Exception("Negative choice mismatch "+backend.Name);
+            if(backend.ArgMax([1,double.NaN])!=-1)throw new Exception("Nonfinite invalid input accepted: "+backend.Name);
+        }
+        Console.WriteLine("NATIVE_CHOICE_CORRECTNESS synthetic vector/boundary tests passed");
+        string[] names=["C# original","C# span","C","Zig","Go"];
+        var kernels=new IChoiceKernel?[]{null,backends[0],backends[1],backends[2],backends[3]};
+        foreach(int agents in new[]{24,100,500}){
+            foreach(int seed in new[]{42,71}){
+                string? reference=null;
+                for(int k=0;k<names.Length;k++){
+                    var host=new ModuleHost();
+                    host.Install(new SurvivalBehavior(kernels[k]));
+                    var world=new SurvivalWorld(domain,new SurvivalConfig(seed,agents,7,3,.55));
+                    var run=new Engine(world,domain,host,new EngineOptions(CognitiveLod:false)).Run();
+                    if(!run.World.ResourcesBalanced)throw new Exception("Ledger changed: "+names[k]);
+                    reference??=run.TraceHash;
+                    if(reference!=run.TraceHash)throw new Exception(
+                        "Full 7-day decision history diverged: "+names[k]+" / "+agents+" / "+seed);
+                }
+            }
+        }
+        Console.WriteLine("NATIVE_CHOICE_CORRECTNESS 24/100/500 NPC, 2 seeds, all 5 backends replay-identical");
+
+        for(int agentsIndex=0;agentsIndex<3;agentsIndex++){
+            int agents=new[]{24,100,500}[agentsIndex];
+            for(int k=0;k<names.Length;k++){
+                // Warmup the JIT and foreign library without including in timing.
+                var host=new ModuleHost();
+                host.Install(new SurvivalBehavior(kernels[k]));
+                var warm=new SurvivalWorld(domain,new SurvivalConfig(99,agents,3,3,.55));
+                new Engine(warm,domain,host,new EngineOptions(CognitiveLod:false)).Run();
+                double[] elapsed=new double[5],alloc=new double[5];
+                for(int seed=0;seed<5;seed++){
+                    var w=new SurvivalWorld(domain,new SurvivalConfig(500+seed,agents,14,3,.55));
+                    GC.Collect();GC.WaitForPendingFinalizers();GC.Collect();
+                    long begin=GC.GetTotalAllocatedBytes(true);
+                    var sw=Stopwatch.StartNew();
+                    var result=new Engine(w,domain,host,new EngineOptions(CognitiveLod:false)).Run();
+                    sw.Stop();
+                    if(!result.World.ResourcesBalanced)throw new Exception("Invalid ledger");
+                    elapsed[seed]=sw.Elapsed.TotalMilliseconds;
+                    alloc[seed]=(GC.GetTotalAllocatedBytes(true)-begin)/(double)result.World.Turns;
+                }
+                Array.Sort(elapsed);
+                Console.WriteLine("NATIVE_WORLD_BENCH "+JsonSerializer.Serialize(new{
+                    agents,backend=names[k],nominalTurns=agents*14*3,medianMs=elapsed[2],
+                    minMs=elapsed[0],maxMs=elapsed[^1],
+                    allocatedBytesPerTurn=alloc.Average()}));
+            }
+        }
+        return 0;
+    }
     static int BenchAcm(string root,DomainRegistry d){
         Console.WriteLine("ACM_ENV "+JsonSerializer.Serialize(new{
             dotnet=Environment.Version.ToString(),
