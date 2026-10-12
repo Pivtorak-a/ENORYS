@@ -19,6 +19,7 @@ static class Program {
             "bench"=>Bench(root,domain,host,args),
             "simulate"=>Simulate(domain,host,args),
             "bench-scheduler"=>BenchScheduler(domain,host),
+            "bench-acm"=>BenchAcm(root,domain),
             "test"=>Tests(root,domain,host),
             _=>Help()
         };
@@ -184,6 +185,13 @@ static class Program {
             Check(acm.Inspect(mindView.Id,60).All(x=>x.Intensity<=
                 afterCorrection.First(y=>y.EmotionId==x.EmotionId&&y.TargetId==x.TargetId&&y.EvidenceRoot==x.EvidenceRoot).Intensity),
                 "lazy emotional decay monotone without new evidence");
+
+            // Hidden objective truth is not part of an affect module's inputs.
+            var noMessage=corrected with {Tick=12,Messages=[]};
+            var beforeSilent=acm.Inspect(mindView.Id,12);
+            acm.Receive(mindView,noMessage);
+            Check(beforeSilent.SequenceEqual(acm.Inspect(mindView.Id,12)),
+                "unobserved world changes cannot inject emotions");
             var affectHost=new ModuleHost();
             affectHost.Install(new SurvivalBehavior());
             affectHost.Install(new AffectiveMap(Path.Combine(root,"data-packs/affect-basic.json")));
@@ -201,6 +209,43 @@ static class Program {
         }catch(Exception e){Console.Error.WriteLine("RESULT integration tests FAILED: "+e);return 1;}
     }
 
+
+    static int BenchAcm(string root,DomainRegistry d){
+        Console.WriteLine("ACM_ENV "+JsonSerializer.Serialize(new{
+            dotnet=Environment.Version.ToString(),
+            platform=System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+            cpus=Environment.ProcessorCount,runs=3,days=14,turnsPerDay=3}));
+        foreach(int agents in new[]{24,100,500})foreach(bool affectEnabled in new[]{false,true}){
+            var timings=new List<double>();var allocations=new List<double>();var episodes=new List<int>();
+            for(int i=0;i<3;i++){
+                var host=new ModuleHost();
+                host.Install(new SurvivalBehavior());
+                AffectiveMap? affect=null;
+                if(affectEnabled){
+                    affect=new AffectiveMap(Path.Combine(root,"data-packs/affect-basic.json"));
+                    host.Install(affect);
+                }
+                var world=new SurvivalWorld(d,new SurvivalConfig(300+i,agents,14,3,.55));
+                GC.Collect();GC.WaitForPendingFinalizers();GC.Collect();
+                long before=GC.GetTotalAllocatedBytes(true);
+                var watch=Stopwatch.StartNew();
+                var result=new Engine(world,d,host,new EngineOptions(CognitiveLod:false)).Run();
+                watch.Stop();
+                if(!result.World.ResourcesBalanced)throw new Exception("ACM resource balance failure");
+                timings.Add(watch.Elapsed.TotalMilliseconds);
+                allocations.Add((GC.GetTotalAllocatedBytes(true)-before)/(double)result.World.Turns);
+                episodes.Add(affect==null?0:Enumerable.Range(1,agents)
+                    .Sum(n=>affect.Inspect($"A{n:D3}",world.Tick).Count));
+            }
+            timings.Sort();
+            Console.WriteLine("ACM_RESULT "+JsonSerializer.Serialize(new{
+                agents,affectEnabled,medianMs=timings[1],
+                allocatedBytesPerTurn=allocations.Average(),
+                averageAffectiveEpisodes=episodes.Average()
+            }));
+        }
+        return 0;
+    }
     static int BenchScheduler(DomainRegistry d,ModuleHost h){
         Console.WriteLine("SCHEDULER_ENV "+JsonSerializer.Serialize(new{
             framework=Environment.Version.ToString(),platform=System.Runtime.InteropServices.RuntimeInformation.OSDescription,
