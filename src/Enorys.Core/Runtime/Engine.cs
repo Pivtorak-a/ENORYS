@@ -10,7 +10,8 @@ namespace Enorys.Core.Runtime;
 public sealed record EngineOptions(bool Planning=true,bool Social=true,bool CognitiveLod=true,bool AuditLod=false,bool EventScheduling=false,
     int HybridActiveAgents=0,int BackgroundMaximumRounds=9,
     int BackgroundRoundsPerDay=3,bool CaptureHistory=true,bool NormalizeCognitiveClock=false,
-    bool HybridUseTimingWheel=true,bool CertifiedDecisions=false,bool AuditCertificates=false);
+    bool HybridUseTimingWheel=true,bool CertifiedDecisions=false,bool AuditCertificates=false,
+    bool AdaptiveCertificateAdmission=false);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
     string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}
@@ -22,6 +23,7 @@ public sealed record EngineResults(WorldMetrics World,long Automatic,long Delibe
     public long CertifiedDecisions {get;init;}
     public long CertificateAbstentions {get;init;}
     public long CertificateAudits {get;init;}
+    public long CertificateThrottled {get;init;}
 }
 /// <summary>Core owns cognition, World Adapter owns truth and material state.</summary>
 public sealed class Engine {
@@ -41,7 +43,9 @@ public sealed class Engine {
     private readonly int cognitiveTickStride;
     private long cognitiveWakeVetoes;
     private long automatic,deliberate,candidateChecks,decisionTicks;
-    private long certified,certificateAbstentions,certificateAudits;
+    private long certified,certificateAbstentions,certificateAudits,certificateThrottled;
+    private readonly byte[]? consecutiveCertificateMisses;
+    private readonly long[]? nextCertificateProbe;
     private int plansCompleted,plansAbandoned,divergences;
     private readonly List<string> history=new();
 
@@ -96,6 +100,10 @@ public sealed class Engine {
         planner=new Planner(domain);
         decision=host.Decisions.FirstOrDefault()??throw new InvalidOperationException("No decision module installed");
         minds=Enumerable.Range(0,world.AgentCount).Select(_=>new AgentMind()).ToArray();
+        if(options.CertifiedDecisions && options.AdaptiveCertificateAdmission){
+            consecutiveCertificateMisses=new byte[world.AgentCount];
+            nextCertificateProbe=new long[world.AgentCount];
+        }
         wakePolicy=host.WakePolicies.FirstOrDefault();
         affects=host.AffectiveModules;
         wakeContributors=host.CognitiveWakeSignals;
@@ -183,8 +191,25 @@ public sealed class Engine {
             Enorys.Abstractions.Decision choice;
             ActionChoiceCertificate? proof=null;
             if(options.CertifiedDecisions && decision is ICertifiedDecisionModule certifier){
-                proof=certifier.TryProve(actor,obs,ctx);
-                if(proof==null)certificateAbstentions++;
+                if(nextCertificateProbe!=null && world.Tick<nextCertificateProbe[index]){
+                    // Admission only throttles the *proof attempt*. The full
+                    // deliberation path remains active on every actor turn.
+                    certificateThrottled++;
+                }else{
+                    proof=certifier.TryProve(actor,obs,ctx);
+                    if(proof==null){
+                        certificateAbstentions++;
+                        if(consecutiveCertificateMisses!=null){
+                            byte misses=consecutiveCertificateMisses[index];
+                            misses=(byte)Math.Min(3,misses+1);
+                            consecutiveCertificateMisses[index]=misses;
+                            if(misses==3)
+                                nextCertificateProbe![index]=world.Tick+4L*world.AgentCount;
+                        }
+                    }else if(consecutiveCertificateMisses!=null){
+                        consecutiveCertificateMisses[index]=0;
+                    }
+                }
             }
             if(proof!=null){
                 if(proof.StrictMargin<=0||!double.IsFinite(proof.StrictMargin))
@@ -278,7 +303,8 @@ public sealed class Engine {
                 CognitiveWakeVetoes=cognitiveWakeVetoes,
                 CertifiedDecisions=certified,
                 CertificateAbstentions=certificateAbstentions,
-                CertificateAudits=certificateAudits
+                CertificateAudits=certificateAudits,
+                CertificateThrottled=certificateThrottled
             };
     }
 }
