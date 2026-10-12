@@ -241,6 +241,11 @@ static class Program {
 
 
     static int Profile(DomainRegistry domain){
+        // Prewarm the 500-agent simulation to remove first-use JIT/tiered compilation spikes.
+        var warmHost=new ModuleHost();warmHost.Install(new SurvivalBehavior());
+        var warmWorld=new SurvivalWorld(domain,new SurvivalConfig(199,500,3,3,.55));
+        new Engine(warmWorld,domain,warmHost,
+            new EngineOptions(CognitiveLod:false)).Run();
         Console.WriteLine("PROFILE_ENV "+JsonSerializer.Serialize(new{
             dotnet=Environment.Version.ToString(),os=System.Runtime.InteropServices.RuntimeInformation.OSDescription,
             cpus=Environment.ProcessorCount,agents=500,days=14,turnsPerDay=3}));
@@ -280,7 +285,29 @@ static class Program {
             if(backend.ArgMax([1,double.NaN])!=-1)throw new Exception("Nonfinite invalid input accepted: "+backend.Name);
         }
         Console.WriteLine("NATIVE_CHOICE_CORRECTNESS synthetic vector/boundary tests passed");
-        string[] names=["C# original","C# span","C","Zig","Go"];
+        foreach(int candidateCount in new[]{8,32,64}){
+            var data=Enumerable.Range(0,candidateCount)
+                .Select(i=>(double)((i*17)%23)/11-1).ToArray();
+            foreach(var backend in backends){
+                // Warm JIT and foreign runtimes ahead of timed calls.
+                for(int i=0;i<1000;i++)backend.ArgMax(data);
+                double[] samples=new double[5];int checksum=0;
+                for(int k=0;k<5;k++){
+                    var timer=Stopwatch.StartNew();
+                    int subtotal=0;
+                    for(int i=0;i<100000;i++)subtotal+=backend.ArgMax(data);
+                    timer.Stop();samples[k]=timer.Elapsed.TotalMilliseconds;
+                    checksum+=subtotal;
+                }
+                Array.Sort(samples);
+                Console.WriteLine("NATIVE_KERNEL_BENCH "+JsonSerializer.Serialize(new{
+                    backend=backend.Name,candidateCount,iterations=100000,
+                    medianMs=samples[2],minMs=samples[0],maxMs=samples[4],checksum
+                }));
+            }
+        }
+
+        string[] names=["C# direct loop","C# span","C","Zig","Go"];
         var kernels=new IChoiceKernel?[]{null,backends[0],backends[1],backends[2],backends[3]};
         foreach(int agents in new[]{24,100,500}){
             foreach(int seed in new[]{42,71}){
