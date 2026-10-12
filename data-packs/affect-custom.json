@@ -1,0 +1,30 @@
+{
+  "namespace": "customaffect",
+  "version": "0.1.0",
+  "emotions": [
+    {
+      "id": "relief",
+      "decay": 0.01,
+      "impulse": 0.5,
+      "actionBias": {
+        "survival:socialize": 0.2
+      },
+      "triggers": [
+        "retract"
+      ],
+      "target": "from"
+    },
+    {
+      "id": "disappointment",
+      "decay": 0.012,
+      "impulse": 0.3,
+      "actionBias": {
+        "survival:guard": 0.2
+      },
+      "triggers": [
+        "accused"
+      ],
+      "target": "from"
+    }
+  ]
+}
