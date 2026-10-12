@@ -1,0 +1,175 @@
+{
+  "id": "survival:default",
+  "namespace": "survival",
+  "version": "0.5.0",
+  "needs": [
+    {
+      "id": "hunger",
+      "daily": 12,
+      "weight": 1,
+      "initial": 25
+    },
+    {
+      "id": "thirst",
+      "daily": 19,
+      "weight": 1.35,
+      "initial": 25
+    },
+    {
+      "id": "fatigue",
+      "daily": 13,
+      "weight": 0.85,
+      "initial": 25
+    },
+    {
+      "id": "cold",
+      "daily": 11,
+      "weight": 0.9,
+      "initial": 25
+    },
+    {
+      "id": "hygiene",
+      "daily": 9,
+      "weight": 0.35,
+      "initial": 25
+    },
+    {
+      "id": "bladder",
+      "daily": 19,
+      "weight": 0.65,
+      "initial": 25
+    },
+    {
+      "id": "safety",
+      "daily": 5,
+      "weight": 0.55,
+      "initial": 25
+    },
+    {
+      "id": "belonging",
+      "daily": 8,
+      "weight": 0.3,
+      "initial": 25
+    },
+    {
+      "id": "morale",
+      "daily": 4,
+      "weight": 0.3,
+      "initial": 25
+    }
+  ],
+  "items": [
+    {
+      "id": "food",
+      "category": "consumable"
+    },
+    {
+      "id": "water",
+      "category": "consumable"
+    },
+    {
+      "id": "raw_food",
+      "category": "material"
+    },
+    {
+      "id": "dirty_water",
+      "category": "material"
+    },
+    {
+      "id": "wood",
+      "category": "material"
+    },
+    {
+      "id": "medicine",
+      "category": "consumable"
+    },
+    {
+      "id": "bandage",
+      "category": "consumable"
+    },
+    {
+      "id": "soap",
+      "category": "consumable"
+    },
+    {
+      "id": "blanket",
+      "category": "material"
+    },
+    {
+      "id": "coat",
+      "category": "material"
+    },
+    {
+      "id": "tool",
+      "category": "material"
+    },
+    {
+      "id": "bed",
+      "category": "material"
+    },
+    {
+      "id": "shelter",
+      "category": "structure"
+    },
+    {
+      "id": "latrine",
+      "category": "structure"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "boil",
+      "inputs": {
+        "dirty_water": 1,
+        "wood": 1
+      },
+      "outputs": {
+        "water": 1
+      }
+    },
+    {
+      "id": "cook",
+      "inputs": {
+        "raw_food": 1
+      },
+      "outputs": {
+        "food": 1
+      }
+    },
+    {
+      "id": "build_shelter",
+      "inputs": {
+        "wood": 3
+      },
+      "outputs": {
+        "shelter": 1
+      }
+    },
+    {
+      "id": "build_latrine",
+      "inputs": {
+        "wood": 2
+      },
+      "outputs": {
+        "latrine": 1
+      }
+    }
+  ],
+  "goals": [
+    {
+      "id": "hydrate",
+      "needId": "thirst",
+      "itemId": "water",
+      "useAction": "drink",
+      "threshold": 42
+    },
+    {
+      "id": "feed",
+      "needId": "hunger",
+      "itemId": "food",
+      "useAction": "eat",
+      "threshold": 48
+    }
+  ],
+  "actions": []
+}
