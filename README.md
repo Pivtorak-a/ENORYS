@@ -11,6 +11,8 @@ Requires the **.NET 10 SDK**. From the repository root:
 ```bash
 dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release -- test
 dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release -- bench
+# Print a reproducible NPC event story as JSON:
+dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release -- simulate 42 24 14
 ```
 
 **Source:** [Enorys.Abstractions](src/Enorys.Abstractions) · [Enorys.Core](src/Enorys.Core) · [Enorys.Domains.Survival](src/Enorys.Domains.Survival) · [External C# plugin](examples/Enorys.CustomBehavior) · [JSON Data Packs](data-packs/).
