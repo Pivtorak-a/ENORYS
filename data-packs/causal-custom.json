@@ -1,0 +1,28 @@
+{
+  "namespace": "customcognition",
+  "version": "0.1.0",
+  "maxRootsPerAgent": 32,
+  "maxDecisionsPerAgent": 32,
+  "rules": [
+    {
+      "id": "solidarity",
+      "eventType": "gift",
+      "target": "from",
+      "action": "survival:socialize",
+      "requireEvidence": false,
+      "affect": "affect:gratitude",
+      "gain": 0.14,
+      "decay": 0.008
+    },
+    {
+      "id": "doubt",
+      "eventType": "evidence",
+      "target": "suspect",
+      "action": "survival:investigate",
+      "requireEvidence": true,
+      "affect": null,
+      "gain": 0.12,
+      "decay": 0.018
+    }
+  ]
+}
