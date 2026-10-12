@@ -1,0 +1,25 @@
+name: Exact Certified NPC Decisions
+on:
+  push:
+    branches: [feature/v10-certified-action-decisions]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  exact-action-certificate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build certified C# cognitive engine
+        run: dotnet build benchmarks/Enorys.HybridSurvival/Enorys.HybridSurvival.csproj -c Release
+      - name: Verify 97 complete-world audits including 5500 agents
+        run: dotnet run --project benchmarks/Enorys.HybridSurvival -c Release --no-build -- cert-test
+      - name: Compare 500 and 5500 NPC whole-world CPU and allocation
+        run: dotnet run --project benchmarks/Enorys.HybridSurvival -c Release --no-build -- cert-bench
+      - name: Verify all existing C# integration tests
+        run: dotnet run --project tests/Enorys.Integration -c Release -- test
