@@ -7,6 +7,9 @@ public sealed class ModuleHost : IModuleRegistry {
     private readonly Dictionary<string, IDecisionModule> _decisions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IAppraisalModule> _appraisals = new(StringComparer.Ordinal);
     private readonly List<IWakePolicy> _wakePolicies=new();
+    private readonly List<IAffectiveModule> _affectiveModules=new();
+    public IReadOnlyList<IAffectiveModule> AffectiveModules=>_affectiveModules;
+    public void AddAffectiveModule(IAffectiveModule module){if(_affectiveModules.Any(x=>x.ModuleId==module.ModuleId))throw new InvalidOperationException("Duplicate affect module");_affectiveModules.Add(module);}
     public IReadOnlyList<IWakePolicy> WakePolicies=>_wakePolicies;
     public void AddWakePolicy(IWakePolicy policy){if(_wakePolicies.Count>0)throw new InvalidOperationException("One active wake policy per world");_wakePolicies.Add(policy);}
     public IEnumerable<IDecisionModule> Decisions => _decisions.Values.OrderBy(x=>x.ModuleId,StringComparer.Ordinal);
