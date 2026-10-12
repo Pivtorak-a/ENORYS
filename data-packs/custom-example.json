@@ -1,0 +1,29 @@
+{
+  "id": "demo:extra-needs",
+  "namespace": "demo",
+  "version": "0.1.0",
+  "needs": [
+    {
+      "id": "focus",
+      "daily": 4,
+      "weight": 0.4,
+      "initial": 15
+    }
+  ],
+  "items": [
+    {
+      "id": "herbal-tea",
+      "category": "consumable"
+    }
+  ],
+  "recipes": [],
+  "goals": [],
+  "actions": [
+    {
+      "id": "drink-tea",
+      "itemId": "herbal-tea",
+      "needId": "focus",
+      "needDelta": -25
+    }
+  ]
+}
