@@ -62,16 +62,11 @@ public sealed class Engine {
         if(options.EventScheduling && wakePolicy!=null)scheduler=new WakeScheduler(world.AgentCount);
     }
     private AgentView PrivateSnapshot(AgentView baseView,ObservationPacket packet,AgentMind mind) {
-        var evidence=mind.Evidence.Values.ToArray();
+        var state=mind.GetSnapshot();
         return baseView with {
-            Evidence=evidence,
-            Trust=new Dictionary<string,double>(mind.Trust),
-            Debts=new Dictionary<string,int>(mind.Debts),
-            Requests=mind.Requests.ToArray(),
-            Nearby=packet.Nearby,
-            Acted=new HashSet<string>(mind.Acted),
-            Reported=new HashSet<string>(mind.Reported),
-            PendingCorrections=mind.Corrections.Select(x=>new RetractionRequest(x.Root,x.To)).ToArray(),
+            Evidence=state.Evidence,Trust=state.Trust,Debts=state.Debts,
+            Requests=state.Requests,Nearby=packet.Nearby,Acted=state.Acted,
+            Reported=state.Reported,PendingCorrections=state.Corrections,
             PlanGoal=mind.Plan?.Goal
         };
     }
