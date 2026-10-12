@@ -34,6 +34,17 @@ Instrumented 500-NPC simulated world (14 days, 21,000 turns), actual samples fro
 
 Earlier samples include JIT/tiered-compilation and large scheduling spikes and are **not representative steady-state**. Each timer uses `Stopwatch.GetTimestamp` inside a decorated `IWorldAdapter` and thus includes some instrumentation overhead. Decision-phase time is **not the cost of argmax alone**.
 
+### Actual cost of argmax inside ENORYS
+
+A second instrumented 500-NPC run (21,000 decisions) used an optimized managed `Span` selector wrapped in a timestamping decorator. CI: [run #38206820469](https://github.com/Pivtorak-a/ENORYS/actions/runs/38206820469).
+
+- Complete world: **220.50 ms**.
+- All decision code: **146.13 ms**.
+- Exactly **21,000** `ArgMax` invocations: **1.053 ms measured, including timer instrumentation**.
+- ArgMax accounts for about **0.48%** of entire measured wall time.
+
+**Amdahl bound:** even infinitely fast native argmax could save at most about **0.48%** of this run, assuming these measurements hold. The real potential saving is smaller, and per-call P/Invoke often makes native slower. **This explains why swapping selection alone did not materially accelerate the game.**
+
 ### Realistic hot-path candidates
 
 | Candidate | Port to native? | Engineering evidence |
