@@ -16,6 +16,7 @@ static class Program {
         host.Install(new SurvivalBehavior());
         return args.FirstOrDefault() switch {
             "bench"=>Bench(root,domain,host,args),
+            "simulate"=>Simulate(domain,host,args),
             "test"=>Tests(root,domain,host),
             _=>Help()
         };
@@ -33,7 +34,24 @@ static class Program {
         var world=new SurvivalWorld(d,new SurvivalConfig(seed,agents,days,3,resource));
         return new Engine(world,d,h,new EngineOptions(planning,social,lod,audit)).Run();
     }
-    static int Help(){Console.WriteLine("Usage: dotnet run -c Release --project tests/Enorys.Integration -- [test|bench]");return 2;}
+
+    static int Simulate(DomainRegistry d,ModuleHost host,string[] args){
+        int seed=args.Length>1?int.Parse(args[1]):42;
+        int agents=args.Length>2?int.Parse(args[2]):24;
+        int days=args.Length>3?int.Parse(args[3]):14;
+        var world=new SurvivalWorld(d,new SurvivalConfig(seed,agents,days,3,.75));
+        var run=new Engine(world,d,host,new EngineOptions()).Run();
+        var output=new {
+            model="ENORYS C# modular v0.5",seed,agents,days,
+            metrics=run.World,
+            run.PlansCompleted,run.Automatic,run.Deliberate,run.TraceHash,
+            recentEvents=world.Events.TakeLast(25).ToArray()
+        };
+        Console.WriteLine(JsonSerializer.Serialize(output,new JsonSerializerOptions{WriteIndented=true}));
+        return run.World.ResourcesBalanced?0:1;
+    }
+    static int Help(){Console.WriteLine("Usage: dotnet run --project tests/Enorys.Integration -c Release -- [test|bench|simulate seed agents days]");return 2;}
+
     static void Check(bool condition,string label){if(!condition)throw new Exception("FAIL: "+label);Console.WriteLine("PASS "+label);}
     static int Tests(string root,DomainRegistry d,ModuleHost host){
         try{
