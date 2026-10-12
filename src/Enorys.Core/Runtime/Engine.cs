@@ -7,10 +7,17 @@ using Enorys.Core.Planning;
 using Enorys.Core.Social;
 namespace Enorys.Core.Runtime;
 
-public sealed record EngineOptions(bool Planning=true,bool Social=true,bool CognitiveLod=true,bool AuditLod=false,bool EventScheduling=false);
+public sealed record EngineOptions(bool Planning=true,bool Social=true,bool CognitiveLod=true,bool AuditLod=false,bool EventScheduling=false,
+    int HybridActiveAgents=0,int BackgroundMaximumRounds=9,
+    int BackgroundRoundsPerDay=3,bool CaptureHistory=true);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
-    string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}}
+    string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}
+    public long BackgroundDecisions {get;init;} public long ActiveDecisions {get;init;}
+    public long FastForwardCalls {get;init;} public long MessagesProcessed {get;init;}
+    public long AffectMessagesProcessed {get;init;} public long MemoryEvidenceProcessed {get;init;}
+    public int CalendarHighWater {get;init;}
+}
 /// <summary>Core owns cognition, World Adapter owns truth and material state.</summary>
 public sealed class Engine {
     private readonly IWorldAdapter world;
@@ -20,6 +27,10 @@ public sealed class Engine {
     private readonly EngineOptions options;
     private readonly WakeScheduler? scheduler;
     private readonly IWakePolicy? wakePolicy;
+    private readonly PulseCalendar? calendar;
+    private readonly IBackgroundDeadlinePolicy? deadlinePolicy;
+    private readonly List<int> dirtyBuffer=new();
+    private long backgroundDecisions,activeDecisions,fastForwardCalls,messagesProcessed,affectMessagesProcessed,memoryEvidenceProcessed;
     private readonly IReadOnlyList<IAffectiveModule> affects;
     private long automatic,deliberate,candidateChecks,decisionTicks;
     private int plansCompleted,plansAbandoned,divergences;
@@ -60,6 +71,16 @@ public sealed class Engine {
         wakePolicy=host.WakePolicies.FirstOrDefault();
         affects=host.AffectiveModules;
         if(options.EventScheduling && wakePolicy!=null)scheduler=new WakeScheduler(world.AgentCount);
+        deadlinePolicy=host.BackgroundDeadline;
+        if(options.HybridActiveAgents>0){
+            if(options.EventScheduling||options.BackgroundRoundsPerDay is <1 or >24||
+               options.HybridActiveAgents>=world.AgentCount||
+               options.BackgroundMaximumRounds is <1 or >100 ||
+               world is not IWorldFastForward || world is not IPrivateWakeFeed ||
+               deadlinePolicy==null)
+                throw new InvalidOperationException("Pulse hybrid requires fast-forward world, non-consuming private wake feed and a registered background deadline policy (and cannot combine with legacy EventScheduling)");
+            calendar=new PulseCalendar(world.AgentCount,options.HybridActiveAgents);
+        }
     }
     private AgentView PrivateSnapshot(AgentView baseView,ObservationPacket packet,AgentMind mind) {
         var state=mind.GetSnapshot();
@@ -74,22 +95,54 @@ public sealed class Engine {
         
         while(world.Tick<world.TotalTurns){
             int index=(int)(world.Tick%world.AgentCount);
+            if(calendar!=null){
+                var feed=(IPrivateWakeFeed)world;
+                feed.DrainWakeSignals(dirtyBuffer);
+                if(world is IObservationSignal signal){
+                    foreach(int pending in dirtyBuffer)
+                        if(signal.HasPendingObservation(pending))
+                            calendar.InvalidateFromPrivateMessage(pending,world.Tick);
+                }
+                dirtyBuffer.Clear();
+                if(index>=options.HybridActiveAgents){
+                    long due=calendar.NextDue;
+                    if(due>world.Tick){
+                        // Never skip over an active actor slot: physics/day effects
+                        // are advanced in the authoritative World Adapter.
+                        int untilNextActive=world.AgentCount-index;
+                        int slots=(int)Math.Min((long)untilNextActive,
+                            Math.Min(due-world.Tick,world.TotalTurns-world.Tick));
+                        if(slots<=0)throw new InvalidOperationException("Pulse deadlock");
+                        ((IWorldFastForward)world).AdvanceSlots(slots);
+                        calendar.Skipped(slots);
+                        fastForwardCalls++;
+                        continue;
+                    }
+                    if(!calendar.ConsumeDue(index,world.Tick))
+                        throw new InvalidOperationException("Invalid pulse deadline ordering");
+                }
+            }
             if(!world.IsAlive(index)){
-                history.Add($"{world.Tick}|inactive");
+                if(options.CaptureHistory)history.Add($"{world.Tick}|inactive");
                 world.Advance();continue;
             }
             if(scheduler!=null){
                 bool pending=world is IObservationSignal signal && signal.HasPendingObservation(index);
                 if(!scheduler.ShouldRun(index,world.Tick,pending)){
-                    history.Add($"{world.Tick}|deferred");
+                    if(options.CaptureHistory)history.Add($"{world.Tick}|deferred");
                     world.Advance();continue;
                 }
             }
             var mind=minds[index];
             var obs=world.Observe(index);
             mind.Ingest(obs);
+            messagesProcessed+=obs.Messages.Count;
+            memoryEvidenceProcessed+=obs.Messages.Count(m=>m.Type is "evidence" or "retract");
             var actor=PrivateSnapshot(world.GetPrivateAgent(index),obs,mind);
-            if(obs.Messages.Count>0)foreach(var affect in affects)affect.Receive(actor,obs);
+            if(obs.Messages.Count>0)foreach(var affect in affects){
+                affect.Receive(actor,obs);
+                affectMessagesProcessed+=obs.Messages.Count;
+            }
             var ctx=new Context(this,mind);
             var before=System.Diagnostics.Stopwatch.GetTimestamp();
             Enorys.Abstractions.Decision choice;
@@ -108,6 +161,10 @@ public sealed class Engine {
                 }else {choice=decision.Choose(actor,obs,ctx);deliberate++; }
             }else {choice=decision.Choose(actor,obs,ctx);deliberate++;}
             decisionTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-before;
+            if(calendar!=null){
+                if(index<options.HybridActiveAgents)activeDecisions++;
+                else backgroundDecisions++;
+            }
             candidateChecks+=choice.CandidateCount;
             var result=world.Execute(choice.Proposal);
             if(result.Accepted){
@@ -118,7 +175,20 @@ public sealed class Engine {
                     if(p.Finished){mind.Plan=null;plansCompleted++;}
                 }
             }else if(mind.Plan!=null){mind.Plan=null;plansAbandoned++;}
-            history.Add($"{obs.Tick}|{actor.Id}|{choice.Proposal.Kind}|{choice.Proposal.Item}|{choice.Proposal.Target}|{result.Accepted}");
+            if(options.CaptureHistory)
+                history.Add($"{obs.Tick}|{actor.Id}|{choice.Proposal.Kind}|{choice.Proposal.Item}|{choice.Proposal.Target}|{result.Accepted}");
+            if(calendar!=null && index>=options.HybridActiveAgents && world.IsAlive(index)){
+                int rounds=1;
+                if(mind.Plan==null && !mind.Evidence.Values.Any(x=>x.Active) &&
+                    mind.Requests.Count==0 && !mind.Debts.Any(x=>x.Value>0) &&
+                    mind.Corrections.Count==0){
+                    var updated=world.GetPrivateAgent(index);
+                    rounds=deadlinePolicy!.NextWakeRounds(updated,obs,
+                        options.BackgroundRoundsPerDay,
+                        options.BackgroundMaximumRounds);
+                }
+                calendar.AfterTurn(index,world.Tick,rounds);
+            }
             if(scheduler!=null && wakePolicy!=null){
                 int sleepTurns=wakePolicy.SleepTurns(actor,obs,choice,result);
                 scheduler.Schedule(index,world.Tick,sleepTurns);
@@ -131,8 +201,14 @@ public sealed class Engine {
             AutoDecisions=automatic,Deliberations=deliberate,PlansCompleted=plansCompleted};
         return new EngineResults(wm,automatic,deliberate,candidateChecks,plansCompleted,plansAbandoned,
             divergences,decisionTicks,Convert.ToHexString(bytes),history){
-                SkippedDecisions=scheduler?.Skipped??0,
-                WakeInterruptions=scheduler?.Interrupted??0
+                WakeInterruptions=(scheduler?.Interrupted??0)+(calendar?.Interrupted??0),
+                SkippedDecisions=(scheduler?.Skipped??0)+(calendar?.SkippedSlots??0),
+                BackgroundDecisions=backgroundDecisions,
+                ActiveDecisions=activeDecisions,FastForwardCalls=fastForwardCalls,
+                MessagesProcessed=messagesProcessed,
+                AffectMessagesProcessed=affectMessagesProcessed,
+                MemoryEvidenceProcessed=memoryEvidenceProcessed,
+                CalendarHighWater=calendar?.HighWater??0
             };
     }
 }
