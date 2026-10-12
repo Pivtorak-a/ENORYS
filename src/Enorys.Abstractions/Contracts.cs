@@ -101,6 +101,7 @@ public record EmotionActivation(string EmotionId,string TargetId,string Evidence
 public interface IAffectiveModule {
     string ModuleId {get;}
     void Receive(AgentView agent,ObservationPacket observation);
+    void ObserveOwnAction(AgentView agent,ActionProposal proposal,long tick);
     IReadOnlyList<EmotionActivation> Inspect(string agentId,long tick);
     double ActionBias(AgentView agent,string actionKind,string? target,long tick);
 }
