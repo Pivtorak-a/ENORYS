@@ -2,7 +2,7 @@ using Enorys.Abstractions;
 namespace Enorys.Domains.Survival;
 
 /// <summary>Example domain-specific decision plugin: none of these item names are in ENORYS Core.</summary>
-public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDecisionModule, IWakePolicy {
+public sealed partial class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDecisionModule, IWakePolicy, ICertifiedDecisionModule {
     private readonly IChoiceKernel? choiceKernel;
     public SurvivalBehavior(IChoiceKernel? choiceKernel=null){this.choiceKernel=choiceKernel;}
 
@@ -121,15 +121,36 @@ public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDeci
         }
         return new Decision(selected.Proposal,"deliberate",selected.Reason,candidates.Count,best);
     }
-    private static (string Incident,string Suspect,double Probability,string Root,double LogLikelihood)? FindSuspicion(AgentView a,long tick,int stride){
+    private static (string Incident,string Suspect,double Probability,string Root,double LogLikelihood)? FindSuspicion(
+        AgentView a,long tick,int stride){
         (string Incident,string Suspect,double Probability,string Root,double LogLikelihood)? result=null;
-        foreach(var group in a.Evidence.Where(e=>e.Active&&e.Suspect!=a.Id).GroupBy(e=>e.Incident+":"+e.Suspect)){
-            var list=group.OrderByDescending(x=>x.LogLikelihood).ThenBy(x=>x.Root,StringComparer.Ordinal).ToArray();
+        void Inspect(IReadOnlyList<PrivateEvidence> list){
+            if(list.Count==0)return;
             double logit=Math.Log(.12/.88);
-            for(int j=0;j<list.Length;j++)logit+=list[j].LogLikelihood*Math.Exp(-Math.Max(0,tick-list[j].Tick)/(800.0*stride))*(j==0?1:.25);
+            for(int j=0;j<list.Count;j++){
+                var evidence=list[j];
+                logit+=evidence.LogLikelihood*
+                    Math.Exp(-Math.Max(0,tick-evidence.Tick)/(800.0*stride))*
+                    (j==0?1:.25);
+            }
             double posterior=1/(1+Math.Exp(-logit));
             if(result==null||posterior>result.Value.Probability)
-                result=(list[0].Incident,list[0].Suspect,posterior,list[0].Root,list[0].LogLikelihood);
+                result=(list[0].Incident,list[0].Suspect,posterior,
+                    list[0].Root,list[0].LogLikelihood);
+        }
+        if(a.HasEvidenceIndex){
+            // Indexed private evidence is sorted and invalidated by AgentMind
+            // only when a received message changes that actor's cognition.
+            foreach(var group in a.IndexedEvidenceGroups){
+                if(group.Suspect!=a.Id)Inspect(group.Records);
+            }
+        }else{
+            // Compatibility for external plugins constructing raw AgentViews.
+            foreach(var group in a.Evidence.Where(e=>e.Active&&e.Suspect!=a.Id)
+                .GroupBy(e=>e.Incident+":"+e.Suspect)){
+                Inspect(group.OrderByDescending(x=>x.LogLikelihood)
+                    .ThenBy(x=>x.Root,StringComparer.Ordinal).ToArray());
+            }
         }
         return result;
     }

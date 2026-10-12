@@ -10,7 +10,8 @@ namespace Enorys.Core.Runtime;
 public sealed record EngineOptions(bool Planning=true,bool Social=true,bool CognitiveLod=true,bool AuditLod=false,bool EventScheduling=false,
     int HybridActiveAgents=0,int BackgroundMaximumRounds=9,
     int BackgroundRoundsPerDay=3,bool CaptureHistory=true,bool NormalizeCognitiveClock=false,
-    bool HybridUseTimingWheel=true);
+    bool HybridUseTimingWheel=true,bool CertifiedDecisions=false,bool AuditCertificates=false,
+    bool AdaptiveCertificateAdmission=false);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
     string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}
@@ -19,6 +20,10 @@ public sealed record EngineResults(WorldMetrics World,long Automatic,long Delibe
     public long AffectMessagesProcessed {get;init;} public long MemoryEvidenceProcessed {get;init;}
     public int CalendarHighWater {get;init;}
     public long CognitiveWakeVetoes {get;init;}
+    public long CertifiedDecisions {get;init;}
+    public long CertificateAbstentions {get;init;}
+    public long CertificateAudits {get;init;}
+    public long CertificateThrottled {get;init;}
 }
 /// <summary>Core owns cognition, World Adapter owns truth and material state.</summary>
 public sealed class Engine {
@@ -38,6 +43,9 @@ public sealed class Engine {
     private readonly int cognitiveTickStride;
     private long cognitiveWakeVetoes;
     private long automatic,deliberate,candidateChecks,decisionTicks;
+    private long certified,certificateAbstentions,certificateAudits,certificateThrottled;
+    private readonly byte[]? consecutiveCertificateMisses;
+    private readonly long[]? nextCertificateProbe;
     private int plansCompleted,plansAbandoned,divergences;
     private readonly List<string> history=new();
 
@@ -47,6 +55,24 @@ public sealed class Engine {
         public bool LodEnabled=>engine.options.CognitiveLod;
         public bool AuditLod=>engine.options.AuditLod;
         public bool HasAffect=>engine.affects.Count>0;
+        public bool IsAffectNeutral(AgentView a,long tick){
+            foreach(var affect in engine.affects){
+                if(affect is not IAffectNeutrality neutrality||
+                   !neutrality.IsNeutral(a.Id,tick/engine.cognitiveTickStride))
+                    return false;
+            }
+            return true;
+        }
+        public bool NoPlanCanActivate(AgentView a){
+            if(!PlanningEnabled)return true;
+            if(mind.Plan!=null)return false;
+            foreach(var goal in engine.plannerDomain.Goals.Values){
+                if(a.Needs.GetValueOrDefault(goal.NeedId)>=goal.Threshold &&
+                   a.Inventory.GetValueOrDefault(goal.ItemId)<=0)
+                    return false;
+            }
+            return true;
+        }
         public int CognitiveTickStride=>engine.cognitiveTickStride;
         public double EmotionBias(AgentView agent,string actionKind,string? target,long tick){
             double sum=0;foreach(var module in engine.affects)sum+=module.ActionBias(agent,actionKind,target,tick/engine.cognitiveTickStride);
@@ -74,6 +100,10 @@ public sealed class Engine {
         planner=new Planner(domain);
         decision=host.Decisions.FirstOrDefault()??throw new InvalidOperationException("No decision module installed");
         minds=Enumerable.Range(0,world.AgentCount).Select(_=>new AgentMind()).ToArray();
+        if(options.CertifiedDecisions && options.AdaptiveCertificateAdmission){
+            consecutiveCertificateMisses=new byte[world.AgentCount];
+            nextCertificateProbe=new long[world.AgentCount];
+        }
         wakePolicy=host.WakePolicies.FirstOrDefault();
         affects=host.AffectiveModules;
         wakeContributors=host.CognitiveWakeSignals;
@@ -98,7 +128,9 @@ public sealed class Engine {
             Evidence=state.Evidence,Trust=state.Trust,Debts=state.Debts,
             Requests=state.Requests,Nearby=packet.Nearby,Acted=state.Acted,
             Reported=state.Reported,PendingCorrections=state.Corrections,
-            PlanGoal=mind.Plan?.Goal
+            PlanGoal=mind.Plan?.Goal,
+            HasEvidenceIndex=true,
+            IndexedEvidenceGroups=state.IndexedEvidenceGroups
         };
     }
     public EngineResults Run(){
@@ -159,7 +191,47 @@ public sealed class Engine {
             var ctx=new Context(this,mind);
             var before=System.Diagnostics.Stopwatch.GetTimestamp();
             Enorys.Abstractions.Decision choice;
-            if(options.CognitiveLod&&decision is IFastDecisionModule fast
+            ActionChoiceCertificate? proof=null;
+            if(options.CertifiedDecisions && decision is ICertifiedDecisionModule certifier){
+                if(nextCertificateProbe!=null && world.Tick<nextCertificateProbe[index]){
+                    // Admission only throttles the *proof attempt*. The full
+                    // deliberation path remains active on every actor turn.
+                    certificateThrottled++;
+                }else{
+                    proof=certifier.TryProve(actor,obs,ctx);
+                    if(proof==null){
+                        certificateAbstentions++;
+                        if(consecutiveCertificateMisses!=null){
+                            byte misses=consecutiveCertificateMisses[index];
+                            misses=(byte)Math.Min(3,misses+1);
+                            consecutiveCertificateMisses[index]=misses;
+                            if(misses==3)
+                                nextCertificateProbe![index]=world.Tick+4L*world.AgentCount;
+                        }
+                    }else if(consecutiveCertificateMisses!=null){
+                        consecutiveCertificateMisses[index]=0;
+                    }
+                }
+            }
+            if(proof!=null){
+                if(proof.StrictMargin<=0||!double.IsFinite(proof.StrictMargin))
+                    throw new InvalidOperationException("Invalid action choice certificate");
+                choice=proof.Choice;
+                if(options.AuditCertificates){
+                    // The proof is independently checked against the full
+                    // reference policy. Fail closed on any disagreement.
+                    var reference=decision.Choose(actor,obs,ctx);
+                    certificateAudits++;
+                    if(reference.Proposal!=choice.Proposal||
+                       reference.CandidateCount!=choice.CandidateCount||
+                       Math.Abs(reference.Score-choice.Score)>1e-10){
+                        throw new InvalidOperationException(
+                            $"Certificate mismatch at tick {obs.Tick}, actor {actor.Id}: "+proof.ProofId);
+                    }
+                }
+                certified++;
+                deliberate++;
+            }else if(options.CognitiveLod&&decision is IFastDecisionModule fast
                 &&mind.Plan!=null && mind.LastInboxTick!=obs.Tick){
                 var maybe=fast.TryFastDecision(actor,obs,ctx);
                 if(maybe!=null){
@@ -230,7 +302,11 @@ public sealed class Engine {
                 AffectMessagesProcessed=affectMessagesProcessed,
                 MemoryEvidenceProcessed=memoryEvidenceProcessed,
                 CalendarHighWater=calendar?.HighWater??0,
-                CognitiveWakeVetoes=cognitiveWakeVetoes
+                CognitiveWakeVetoes=cognitiveWakeVetoes,
+                CertifiedDecisions=certified,
+                CertificateAbstentions=certificateAbstentions,
+                CertificateAudits=certificateAudits,
+                CertificateThrottled=certificateThrottled
             };
     }
 }

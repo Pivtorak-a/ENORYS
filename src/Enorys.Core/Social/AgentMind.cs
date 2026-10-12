@@ -12,7 +12,8 @@ public sealed record AgentMindSnapshot(
     IReadOnlyList<HelpRequest> Requests,
     IReadOnlySet<string> Acted,
     IReadOnlySet<string> Reported,
-    IReadOnlyList<RetractionRequest> Corrections);
+    IReadOnlyList<RetractionRequest> Corrections,
+    IReadOnlyList<IndexedEvidenceGroup> IndexedEvidenceGroups);
 
 public sealed class AgentMind {
     private AgentMindSnapshot? cachedSnapshot;
@@ -25,7 +26,13 @@ public sealed class AgentMind {
             Array.AsReadOnly(Requests.ToArray()),
             Acted.ToFrozenSet(StringComparer.Ordinal),
             Reported.ToFrozenSet(StringComparer.Ordinal),
-            Array.AsReadOnly(Corrections.Select(x=>new RetractionRequest(x.Root,x.To)).ToArray()));
+            Array.AsReadOnly(Corrections.Select(x=>new RetractionRequest(x.Root,x.To)).ToArray()),
+            Array.AsReadOnly(Evidence.Values.Where(x=>x.Active)
+                .GroupBy(x=>x.Incident+"\u001f"+x.Suspect,StringComparer.Ordinal)
+                .Select(group=>new IndexedEvidenceGroup(group.First().Incident,
+                    group.First().Suspect,
+                    Array.AsReadOnly(group.OrderByDescending(x=>x.LogLikelihood)
+                        .ThenBy(x=>x.Root,StringComparer.Ordinal).ToArray()))).ToArray()));
         return cachedSnapshot;
     }
 

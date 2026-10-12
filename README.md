@@ -85,6 +85,23 @@ dotnet run --project benchmarks/Enorys.HybridSurvival -c Release -- test
 dotnet run --project benchmarks/Enorys.HybridSurvival -c Release -- bench
 ```
 
+## Exact certified choices and indexed social cognition (experiment 010)
+
+ENORYS now has an **optional, independently auditable action-choice certificate** for the real C# survival decision module: when all relevant planner/social/affect dependencies are known inactive, a no-list-allocating evaluator proves the current best action by a **strict utility margin**. If anything is unknown, it fails closed to full deliberation. Every actor **still chooses and executes an action each turn**, so this avoids the quality loss of approximating entire actor turns away.
+
+New optional flags: `CertifiedDecisions`, `AuditCertificates`, `AdaptiveCertificateAdmission` in `EngineOptions`. Private evidence is also grouped/sorted once per memory update instead of every decision; third-party manually constructed `AgentView` snapshots retain the compatible unindexed evaluator.
+
+**Verification:** 97 audited real-world scenario instances (including a 5,500-NPC full action-history replay) preserve action order, world event counts, health and resource ledger. In seven-day 5,500-NPC headless tests, static certificates reduced transient allocations from **789 → 647 MiB** in sparse social activity and **877 → 771 MiB** in denser social activity. Recorded wall-time improvements were modest and varied between shared CI runs; adaptive proof admission is **not** a universal speed win.
+
+Read [the full mathematical design and opt-in safety conditions](docs/ADR-0006-CERTIFIED-DECISIONS.md) and [reproducible Experiment 010 timing and gameplay comparisons](docs/EXPERIMENT-010-CERTIFIED-DECISIONS.md).
+
+```bash
+dotnet run --project benchmarks/Enorys.HybridSurvival -c Release -- cert-test
+dotnet run --project benchmarks/Enorys.HybridSurvival -c Release -- cert-bench
+```
+
+This is a **one-turn proof of the chosen action**, not a guarantee that future turns are invariant or may be omitted. Default scheduler and certification switches remain off.
+
 ## Legacy research demos (JavaScript)
 
 

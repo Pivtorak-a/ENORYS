@@ -23,7 +23,8 @@ internal static class Program {
     }
     private sealed record Case(int Seed,int Agents,int Active,int Days,
         bool Sparse,int MaximumRounds,bool Affect,double Visibility,double Resources,
-        bool Trace=true,bool Wheel=true,bool Conservative=false);
+        bool Trace=true,bool Wheel=true,bool Conservative=false,
+        bool Certified=false,bool Audit=false,bool Adaptive=false);
     private sealed record Record(EngineResults Outcome,SurvivalWorld World,
         double Milliseconds,double AllocationMiB,double CurrentWorkingSetMiB,
         int ActiveEmotionEpisodes,int BackgroundEmotionEpisodes,
@@ -41,6 +42,8 @@ internal static class Program {
             interruptedWakes=Outcome.WakeInterruptions,
             wakeHeapHighWater=Outcome.CalendarHighWater,
             cognitiveWakeVetoes=Outcome.CognitiveWakeVetoes,
+            certified=Outcome.CertifiedDecisions,certAbstained=Outcome.CertificateAbstentions,
+            audits=Outcome.CertificateAudits,throttled=Outcome.CertificateThrottled,
             messagesProcessed=Outcome.MessagesProcessed,
             memoryEvidenceMessages=Outcome.MemoryEvidenceProcessed,
             affectMessageVisits=Outcome.AffectMessagesProcessed,
@@ -96,7 +99,9 @@ internal static class Program {
                 BackgroundMaximumRounds:test.MaximumRounds,
                 BackgroundRoundsPerDay:3,
                 CaptureHistory:test.Trace,NormalizeCognitiveClock:true,
-                HybridUseTimingWheel:test.Wheel)).Run();
+                HybridUseTimingWheel:test.Wheel,
+                CertifiedDecisions:test.Certified,AuditCertificates:test.Audit,
+                AdaptiveCertificateAdmission:test.Adaptive)).Run();
         sw.Stop();
         var allocationMiB=(GC.GetTotalAllocatedBytes(true)-allocated)/1048576.0;
         int activeEmotion=0,backgroundEmotion=0;
@@ -234,12 +239,119 @@ internal static class Program {
             return 0;
         }catch(Exception e){Console.Error.WriteLine("HYBRID_BENCHMARKS FAIL "+e);return 1;}
     }
+
+    private static int CertificateTests(string root,DomainRegistry domain){
+        try{
+            long successes=0,rejections=0;
+            foreach(int population in new[]{24,100,500})
+            foreach(int seed in new[]{11,37,71,97})
+            foreach(bool affect in new[]{false,true})
+            foreach(bool socialDensity in new[]{false,true}){
+                var setup=new Case(seed,population,Math.Min(8,population/2),
+                    Days:6,Sparse:false,MaximumRounds:1,
+                    Affect:affect,Visibility:socialDensity ? .3 : .025,Resources:.7,
+                    Trace:true);
+                var full=Run(root,domain,setup);
+                // Full reference policy runs alongside strict proof validation.
+                foreach(bool adaptive in new[]{false,true}){
+                    var checkedRun=Run(root,domain,
+                        setup with{Certified=true,Audit=true,Adaptive=adaptive});
+                    if(full.Outcome.TraceHash!=checkedRun.Outcome.TraceHash||
+                       full.Outcome.World.Events!=checkedRun.Outcome.World.Events||
+                       full.Outcome.World.Alive!=checkedRun.Outcome.World.Alive||
+                       full.Outcome.World.AverageHealth!=checkedRun.Outcome.World.AverageHealth||
+                       !full.Outcome.World.Actions.OrderBy(x=>x.Key).SequenceEqual(
+                          checkedRun.Outcome.World.Actions.OrderBy(x=>x.Key)))
+                        throw new Exception($"Proof changes world {population}/{seed}/{affect}/{socialDensity}/{adaptive}");
+                    if(checkedRun.Outcome.CertifiedDecisions!=checkedRun.Outcome.CertificateAudits)
+                        throw new Exception("Missing shadow audits");
+                    successes+=checkedRun.Outcome.CertifiedDecisions;
+                    rejections+=checkedRun.Outcome.CertificateAbstentions;
+                    Console.WriteLine("CERT_PARITY "+JsonSerializer.Serialize(new{
+                        population,seed,affect,socialDensity,adaptive,
+                        certified=checkedRun.Outcome.CertifiedDecisions,
+                        rejected=checkedRun.Outcome.CertificateAbstentions,
+                        throttled=checkedRun.Outcome.CertificateThrottled,
+                        audits=checkedRun.Outcome.CertificateAudits,
+                        identicalTrace=true,balanced=checkedRun.Outcome.World.ResourcesBalanced
+                    }));
+                }
+            }
+            var populationTest=new Case(42,5500,500,3,false,1,true,.08,.72,Trace:true);
+            var largeControl=Run(root,domain,populationTest);
+            var largeOptimized=Run(root,domain,populationTest with {
+                Certified=true,Audit=true,Adaptive=true
+            });
+            Check(largeControl.Outcome.TraceHash==largeOptimized.Outcome.TraceHash&&
+                  largeControl.Outcome.World.Events==largeOptimized.Outcome.World.Events&&
+                  largeControl.Outcome.World.AverageHealth==largeOptimized.Outcome.World.AverageHealth&&
+                  largeOptimized.Outcome.World.ResourcesBalanced,
+                  "5500-agent full world exact action-trace, health and resources parity");
+            Check(largeOptimized.Outcome.CertificateAudits>0&&
+                  largeOptimized.Outcome.CertificateThrottled>0,
+                  "large-world adaptive mode exercises audited proofs and safe throttling");
+            Check(successes>0,"certified policy used for actual NPC decisions, not only fallbacks");
+            Check(rejections>0,"certificate rejects contexts with unproven dependencies");
+            Console.WriteLine("CERT_TESTS PASS "+JsonSerializer.Serialize(new{
+                testWorlds=97,successes,rejections
+            }));
+            return 0;
+        }catch(Exception error){
+            Console.Error.WriteLine("CERT_TESTS FAIL "+error);return 1;
+        }
+    }
+    private static int CertificateBench(string root,DomainRegistry domain){
+        try{
+            Console.WriteLine("CERT_ENV "+JsonSerializer.Serialize(new{
+                runtime=Environment.Version.ToString(),
+                platform=System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+                cores=Environment.ProcessorCount,
+                design="Identical full world decisions with/without audited fast winner proof"
+            }));
+            var warm=new Case(22,100,24,4,false,1,true,.1,.75,false);
+            Run(root,domain,warm);
+            Run(root,domain,warm with{Certified=true});
+            foreach(int n in new[]{500,5500})
+            foreach((string label,double visibility) mode in new[]{
+                ("sparse-social",.025),("denser-social",.18)}){
+                int days=n==500?7:7;
+                foreach(int seed in new[]{100,101,102}){
+                    Case baseCase=new(seed,n,Math.Min(500,n/2),days,false,1,true,
+                        mode.visibility,.75,Trace:false);
+                    int[][] orders=[[0,1,2],[2,0,1],[1,2,0]];
+                    foreach(int variant in orders[seed-100]){
+                        var result=Run(root,domain,baseCase with{
+                            Certified=variant!=0,Adaptive=variant==2
+                        });
+                        if(!result.Outcome.World.ResourcesBalanced)
+                            throw new Exception("Resource imbalance");
+                        Console.WriteLine("CERT_BENCH "+JsonSerializer.Serialize(new{
+                            scenario=mode.label,agents=n,seed,certified=variant!=0,adaptive=variant==2,
+                            milliseconds=result.Milliseconds,allocatedMiB=result.AllocationMiB,
+                            decisions=result.Outcome.Deliberate,
+                            certifiedDecisions=result.Outcome.CertifiedDecisions,
+                            certificateAbstentions=result.Outcome.CertificateAbstentions,
+                            throttled=result.Outcome.CertificateThrottled,
+                            worldActions=result.Outcome.World.Events,
+                            avgHealth=result.Outcome.World.AverageHealth,
+                            balanced=result.Outcome.World.ResourcesBalanced,
+                            actionHistogram=result.Outcome.World.Actions.OrderBy(x=>x.Key).ToArray()
+                        }));
+                    }
+                }
+            }
+            Console.WriteLine("CERT_BENCHMARKS PASS");
+            return 0;
+        }catch(Exception e){Console.Error.WriteLine("CERT_BENCHMARKS FAIL "+e);return 1;}
+    }
     public static int Main(string[] args){
         string root=Root();
         var domain=DomainRegistry.Load(Path.Combine(root,"data-packs/survival.json"));
         return args.FirstOrDefault() switch {
             "test"=>Tests(root,domain),
             "bench"=>Bench(root,domain),
+            "cert-test"=>CertificateTests(root,domain),
+            "cert-bench"=>CertificateBench(root,domain),
             _=>2
         };
     }
