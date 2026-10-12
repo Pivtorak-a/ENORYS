@@ -21,5 +21,7 @@ jobs:
         run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- test
       - name: Reproducible C# scenario CLI
         run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- simulate 42 24 14 > /tmp/enorys-scenario.json
+      - name: Compare event-aware scheduler load
+        run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- bench-scheduler
       - name: Baseline versus LOD benchmarks
         run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- bench
