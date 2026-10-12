@@ -1,0 +1,25 @@
+name: C vs C# Cognitive Math
+on:
+  push:
+    branches: [experiment/native-c-vs-dotnet]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  benchmark-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build C library -O3
+        run: gcc -O3 -march=x86-64 -fPIC -shared native/enorys_math.c -o native/libenorys_math.so -lm -Wall -Wextra -Werror
+      - name: Build .NET Release
+        run: dotnet build benchmarks/Enorys.NativeMath/Enorys.NativeMath.csproj -c Release
+      - name: Validate numerical correctness and measure native-call overhead
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/native
+        run: dotnet run --project benchmarks/Enorys.NativeMath/Enorys.NativeMath.csproj -c Release --no-build
