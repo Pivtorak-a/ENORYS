@@ -24,7 +24,7 @@ internal static class Program {
     private sealed record Case(int Seed,int Agents,int Active,int Days,
         bool Sparse,int MaximumRounds,bool Affect,double Visibility,double Resources,
         bool Trace=true,bool Wheel=true,bool Conservative=false,
-        bool Certified=false,bool Audit=false);
+        bool Certified=false,bool Audit=false,bool Adaptive=false);
     private sealed record Record(EngineResults Outcome,SurvivalWorld World,
         double Milliseconds,double AllocationMiB,double CurrentWorkingSetMiB,
         int ActiveEmotionEpisodes,int BackgroundEmotionEpisodes,
@@ -43,7 +43,7 @@ internal static class Program {
             wakeHeapHighWater=Outcome.CalendarHighWater,
             cognitiveWakeVetoes=Outcome.CognitiveWakeVetoes,
             certified=Outcome.CertifiedDecisions,certAbstained=Outcome.CertificateAbstentions,
-            audits=Outcome.CertificateAudits,
+            audits=Outcome.CertificateAudits,throttled=Outcome.CertificateThrottled,
             messagesProcessed=Outcome.MessagesProcessed,
             memoryEvidenceMessages=Outcome.MemoryEvidenceProcessed,
             affectMessageVisits=Outcome.AffectMessagesProcessed,
@@ -100,7 +100,8 @@ internal static class Program {
                 BackgroundRoundsPerDay:3,
                 CaptureHistory:test.Trace,NormalizeCognitiveClock:true,
                 HybridUseTimingWheel:test.Wheel,
-                CertifiedDecisions:test.Certified,AuditCertificates:test.Audit)).Run();
+                CertifiedDecisions:test.Certified,AuditCertificates:test.Audit,
+                AdaptiveCertificateAdmission:test.Adaptive)).Run();
         sw.Stop();
         var allocationMiB=(GC.GetTotalAllocatedBytes(true)-allocated)/1048576.0;
         int activeEmotion=0,backgroundEmotion=0;
@@ -252,29 +253,34 @@ internal static class Program {
                     Trace:true);
                 var full=Run(root,domain,setup);
                 // Full reference policy runs alongside strict proof validation.
-                var checkedRun=Run(root,domain,setup with{Certified=true,Audit=true});
-                if(full.Outcome.TraceHash!=checkedRun.Outcome.TraceHash||
-                   full.Outcome.World.Events!=checkedRun.Outcome.World.Events||
-                   full.Outcome.World.Alive!=checkedRun.Outcome.World.Alive||
-                   full.Outcome.World.AverageHealth!=checkedRun.Outcome.World.AverageHealth||
-                   !full.Outcome.World.Actions.OrderBy(x=>x.Key).SequenceEqual(
-                      checkedRun.Outcome.World.Actions.OrderBy(x=>x.Key)))
-                    throw new Exception($"Proof changes world {population}/{seed}/{affect}/{socialDensity}");
-                if(checkedRun.Outcome.CertifiedDecisions!=checkedRun.Outcome.CertificateAudits)
-                    throw new Exception("Missing shadow audits");
-                successes+=checkedRun.Outcome.CertifiedDecisions;
-                rejections+=checkedRun.Outcome.CertificateAbstentions;
-                Console.WriteLine("CERT_PARITY "+JsonSerializer.Serialize(new{
-                    population,seed,affect,socialDensity,certified=checkedRun.Outcome.CertifiedDecisions,
-                    rejected=checkedRun.Outcome.CertificateAbstentions,
-                    audits=checkedRun.Outcome.CertificateAudits,
-                    identicalTrace=true,balanced=checkedRun.Outcome.World.ResourcesBalanced
-                }));
+                foreach(bool adaptive in new[]{false,true}){
+                    var checkedRun=Run(root,domain,
+                        setup with{Certified=true,Audit=true,Adaptive=adaptive});
+                    if(full.Outcome.TraceHash!=checkedRun.Outcome.TraceHash||
+                       full.Outcome.World.Events!=checkedRun.Outcome.World.Events||
+                       full.Outcome.World.Alive!=checkedRun.Outcome.World.Alive||
+                       full.Outcome.World.AverageHealth!=checkedRun.Outcome.World.AverageHealth||
+                       !full.Outcome.World.Actions.OrderBy(x=>x.Key).SequenceEqual(
+                          checkedRun.Outcome.World.Actions.OrderBy(x=>x.Key)))
+                        throw new Exception($"Proof changes world {population}/{seed}/{affect}/{socialDensity}/{adaptive}");
+                    if(checkedRun.Outcome.CertifiedDecisions!=checkedRun.Outcome.CertificateAudits)
+                        throw new Exception("Missing shadow audits");
+                    successes+=checkedRun.Outcome.CertifiedDecisions;
+                    rejections+=checkedRun.Outcome.CertificateAbstentions;
+                    Console.WriteLine("CERT_PARITY "+JsonSerializer.Serialize(new{
+                        population,seed,affect,socialDensity,adaptive,
+                        certified=checkedRun.Outcome.CertifiedDecisions,
+                        rejected=checkedRun.Outcome.CertificateAbstentions,
+                        throttled=checkedRun.Outcome.CertificateThrottled,
+                        audits=checkedRun.Outcome.CertificateAudits,
+                        identicalTrace=true,balanced=checkedRun.Outcome.World.ResourcesBalanced
+                    }));
+                }
             }
             Check(successes>0,"certified policy used for actual NPC decisions, not only fallbacks");
             Check(rejections>0,"certificate rejects contexts with unproven dependencies");
             Console.WriteLine("CERT_TESTS PASS "+JsonSerializer.Serialize(new{
-                testWorlds=48,successes,rejections
+                testWorlds=96,successes,rejections
             }));
             return 0;
         }catch(Exception error){
@@ -299,17 +305,20 @@ internal static class Program {
                 foreach(int seed in new[]{100,101,102}){
                     Case baseCase=new(seed,n,Math.Min(500,n/2),days,false,1,true,
                         mode.visibility,.75,Trace:false);
-                    int[] order=seed%2==0?[0,1]:[1,0];
-                    foreach(int variant in order){
-                        var result=Run(root,domain,baseCase with{Certified=variant==1});
+                    int[][] orders=[[0,1,2],[2,0,1],[1,2,0]];
+                    foreach(int variant in orders[seed-100]){
+                        var result=Run(root,domain,baseCase with{
+                            Certified=variant!=0,Adaptive=variant==2
+                        });
                         if(!result.Outcome.World.ResourcesBalanced)
                             throw new Exception("Resource imbalance");
                         Console.WriteLine("CERT_BENCH "+JsonSerializer.Serialize(new{
-                            scenario=mode.label,agents=n,seed,certified=variant==1,
+                            scenario=mode.label,agents=n,seed,certified=variant!=0,adaptive=variant==2,
                             milliseconds=result.Milliseconds,allocatedMiB=result.AllocationMiB,
                             decisions=result.Outcome.Deliberate,
                             certifiedDecisions=result.Outcome.CertifiedDecisions,
                             certificateAbstentions=result.Outcome.CertificateAbstentions,
+                            throttled=result.Outcome.CertificateThrottled,
                             worldActions=result.Outcome.World.Events,
                             avgHealth=result.Outcome.World.AverageHealth,
                             balanced=result.Outcome.World.ResourcesBalanced,
