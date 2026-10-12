@@ -65,6 +65,8 @@ public interface IDecisionContext {
     bool SocialEnabled { get; }
     bool LodEnabled { get; }
     bool AuditLod { get; }
+    bool HasAffect { get; }
+    double EmotionBias(AgentView agent,string actionKind,string? target,long tick);
 }
 public interface IFastDecisionModule {
     Decision? TryFastDecision(AgentView agent, ObservationPacket observations, IDecisionContext context);
@@ -77,6 +79,7 @@ public interface IModuleRegistry {
     void AddDecision(IDecisionModule module);
     void AddAppraisal(IAppraisalModule module);
     void AddWakePolicy(IWakePolicy policy);
+    void AddAffectiveModule(IAffectiveModule module);
 }
 public interface IAppraisalModule {
     string ModuleId { get; }
@@ -90,4 +93,14 @@ public interface IObservationSignal {
 /** Optional domain wake policy. Delay is in this agent's own turns, not global ticks. */
 public interface IWakePolicy {
     int SleepTurns(AgentView agent,ObservationPacket packet,Decision decision,ActionResult result);
+}
+
+/** Domain-independent, agent-targeted subjective emotion episode. */
+public record EmotionActivation(string EmotionId,string TargetId,string EvidenceRoot,
+    double Intensity,long UpdatedTick);
+public interface IAffectiveModule {
+    string ModuleId {get;}
+    void Receive(AgentView agent,ObservationPacket observation);
+    IReadOnlyList<EmotionActivation> Inspect(string agentId,long tick);
+    double ActionBias(AgentView agent,string actionKind,string? target,long tick);
 }
