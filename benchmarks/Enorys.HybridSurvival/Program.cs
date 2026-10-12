@@ -252,7 +252,7 @@ internal static class Program {
                     Trace:true);
                 var full=Run(root,domain,setup);
                 // Full reference policy runs alongside strict proof validation.
-                var checkedRun=Run(root,domain,setup with{Certified=true,Audit:true});
+                var checkedRun=Run(root,domain,setup with{Certified=true,Audit=true});
                 if(full.Outcome.TraceHash!=checkedRun.Outcome.TraceHash||
                    full.Outcome.World.Events!=checkedRun.Outcome.World.Events||
                    full.Outcome.World.Alive!=checkedRun.Outcome.World.Alive||
