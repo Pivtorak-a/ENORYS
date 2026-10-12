@@ -81,3 +81,12 @@ public interface IAppraisalModule {
     string ModuleId { get; }
     double Evaluate(AgentView subject,PrivateEvidence evidence);
 }
+
+/** Optional world-owned signal: checking for inbox messages must not consume them. */
+public interface IObservationSignal {
+    bool HasPendingObservation(int agentIndex);
+}
+/** Optional domain wake policy. Delay is in this agent's own turns, not global ticks. */
+public interface IWakePolicy {
+    int SleepTurns(AgentView agent,ObservationPacket packet,Decision decision,ActionResult result);
+}
