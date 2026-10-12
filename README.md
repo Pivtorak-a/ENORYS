@@ -1,8 +1,8 @@
 # ENORYS · Modular Cognitive Engine
 
-**Headless, modular, data-driven cognitive agent research engine, targeting C# / .NET 10.** Current experimental v0.6 includes a runnable C# world/agent loop, survival domain, plan persistence, socially transmitted evidence, and a validated external C# plugin and data-pack example.
+**Headless, modular, data-driven cognitive agent research engine, targeting C# / .NET 10.** Experimental C#/.NET 10 core with optional modular cognition, social evidence, planning, emotion, causal provenance and user-defined rule packs; research through experiment 011.
 
-> **Status:** C# v0.6 engineering proof of concept, **not** a production SDK, complete Affective Cognitive Map, Godot game or validated psychological simulator. The existing JavaScript tools are independent reference demos.
+> **Status:** experimental C#/.NET 10 research engine, not a production SDK, complete human cognition model, Godot game or validated psychological simulator. The existing JavaScript tools are independent reference demos.
 
 ### Run the C# engine
 
