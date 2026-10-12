@@ -10,7 +10,7 @@ namespace Enorys.Domains.Survival;
 public sealed partial class SurvivalBehavior {
     public ActionChoiceCertificate? TryProve(
         AgentView a,ObservationPacket p,IDecisionContext ctx){
-        if(!ctx.NoPlanCanActivate(a)||!ctx.IsAffectNeutral(a,p.Tick))
+        if(ctx.HasCausalGraph||!ctx.NoPlanCanActivate(a)||!ctx.IsAffectNeutral(a,p.Tick))
             return null;
         if(ctx.SocialEnabled){
             if(a.Evidence.Any(e=>e.Active)||a.Requests.Count>0||
