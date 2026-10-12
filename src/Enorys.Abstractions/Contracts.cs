@@ -105,3 +105,10 @@ public interface IAffectiveModule {
     IReadOnlyList<EmotionActivation> Inspect(string agentId,long tick);
     double ActionBias(AgentView agent,string actionKind,string? target,long tick);
 }
+
+/** Optional pure numeric choice kernel. C, Zig, Go or managed can implement it.
+    Span data must not be retained beyond one call. */
+public interface IChoiceKernel {
+    string Name { get; }
+    int ArgMax(ReadOnlySpan<double> scores);
+}
