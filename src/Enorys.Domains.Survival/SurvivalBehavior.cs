@@ -114,7 +114,8 @@ public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDeci
         }
         var selected=candidates[0];
         double best=selected.Utility+ctx.EmotionBias(a,selected.Proposal.Kind,selected.Proposal.Target,p.Tick);
-        foreach(var x in candidates.Skip(1)){
+        for(int i=1;i<candidates.Count;i++){
+            var x=candidates[i];
             double score=x.Utility+ctx.EmotionBias(a,x.Proposal.Kind,x.Proposal.Target,p.Tick);
             if(score>best){selected=x;best=score;}
         }
