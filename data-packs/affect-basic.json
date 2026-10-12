@@ -1,0 +1,48 @@
+{
+  "namespace": "affect",
+  "version": "0.1.0",
+  "emotions": [
+    {
+      "id": "anger",
+      "decay": 0.008,
+      "impulse": 1,
+      "actionBias": {
+        "survival:accuse": 0.27,
+        "survival:investigate": 0.08
+      }
+    },
+    {
+      "id": "fear",
+      "decay": 0.006,
+      "impulse": 1,
+      "actionBias": {
+        "survival:guard": 0.18,
+        "survival:accuse": -0.12
+      }
+    },
+    {
+      "id": "sadness",
+      "decay": 0.005,
+      "impulse": 1,
+      "actionBias": {
+        "survival:socialize": 0.1
+      }
+    },
+    {
+      "id": "gratitude",
+      "decay": 0.004,
+      "impulse": 1,
+      "actionBias": {
+        "survival:give": 0.24
+      }
+    },
+    {
+      "id": "guilt",
+      "decay": 0.007,
+      "impulse": 1,
+      "actionBias": {
+        "survival:retract": 0.3
+      }
+    }
+  ]
+}
