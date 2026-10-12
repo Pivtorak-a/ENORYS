@@ -19,12 +19,14 @@ public record AgentView(string Id,int Zone,int Group,bool Alive,
     string? PlanGoal,IReadOnlyList<PrivateEvidence> Evidence,
     IReadOnlyDictionary<string,double> Trust,IReadOnlyDictionary<string,int> Debts,
     IReadOnlyList<string> Nearby,IReadOnlyList<HelpRequest> Requests,
-    IReadOnlySet<string> Acted,IReadOnlySet<string> Reported);
+    IReadOnlySet<string> Acted,IReadOnlySet<string> Reported,
+    IReadOnlyList<RetractionRequest> PendingCorrections);
 
 public record Traits(double Greed,double Generosity,double Norm,double Courage,double Curiosity,double Sociability);
 public record PrivateEvidence(string Root,string Incident,string Suspect,double LogLikelihood,
     string Source,string Sender,long Tick,bool Active = true);
 public record HelpRequest(string From,string Item,long Tick);
+public record RetractionRequest(string Root,string Recipient);
 public record ObservationPacket(long Tick,int Day,double Weather,
     IReadOnlyDictionary<string,int> Depot,IReadOnlyDictionary<string,bool> SourcesKnown,
     IReadOnlyList<string> Nearby,IReadOnlyList<Message> Messages);
