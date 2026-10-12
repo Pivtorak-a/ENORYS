@@ -20,7 +20,7 @@ internal sealed class Survivor {
     public HashSet<string> Acted=new(StringComparer.Ordinal);
 }
 
-public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal, IWorldFastForward, IPrivateWakeFeed {
+public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal, IWorldFastForward, IPrivateWakeFeed, IWorldScheduledStimuli {
     const string S="survival:";
     public readonly DomainRegistry Domain;
     public readonly SurvivalConfig Config;
@@ -28,6 +28,18 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal, IWorldFas
     private readonly Dictionary<string,Survivor> byId;
     private readonly Dictionary<int,Survivor[]> zones;
     private readonly Dictionary<string,WorldEvent> incidents=new(StringComparer.Ordinal);
+    private readonly SortedDictionary<long,List<(int Receiver,Message Message)>> scheduledInputs=new();
+    public long NextExternalStimulusTick=>scheduledInputs.Count==0?long.MaxValue:scheduledInputs.First().Key;
+    // Trusted scenario fixture hook. Does not expose World Authority to ordinary NPC modules.
+    public void ScheduleObservation(long atTick,int receiver,Message observation){
+        if(atTick<=tick||atTick>=TotalTurns||receiver<0||receiver>=people.Length)
+            throw new ArgumentOutOfRangeException(nameof(atTick));
+        if(!scheduledInputs.TryGetValue(atTick,out var list)){
+            list=new List<(int,Message)>();
+            scheduledInputs.Add(atTick,list);
+        }
+        list.Add((receiver,observation));
+    }
     private readonly Queue<int> dirtyActors=new();
     private readonly HashSet<int> dirtySet=new();
     private readonly Dictionary<string,int> depot,sources,initial,consumed,converted;
@@ -255,7 +267,8 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal, IWorldFas
         long daySize=(long)people.Length*Config.TurnsPerDay;
         while(tick<target){
             long boundary=(tick/daySize+1)*daySize;
-            tick=Math.Min(target,boundary);
+            long external=NextExternalStimulusTick;
+            tick=Math.Min(target,Math.Min(boundary,external));
             if(tick==boundary){
                 day++;
                 bool anyDeath=false;
@@ -274,6 +287,10 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal, IWorldFas
                     if(a.Health<=0){a.Alive=false;anyDeath=true;}
                 }
                 if(anyDeath)InvalidatePublicViews(peerChanged:true);
+            }
+            if(tick==external&&scheduledInputs.Remove(tick,out var entries)){
+                foreach(var entry in entries)
+                    Send(people[entry.Receiver].Id,entry.Message with {Tick=tick});
             }
         }
     }
