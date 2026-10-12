@@ -1,0 +1,48 @@
+{
+  "namespace": "cognition",
+  "version": "0.1.0",
+  "maxRootsPerAgent": 96,
+  "maxDecisionsPerAgent": 96,
+  "rules": [
+    {
+      "id": "investigate-suspicion",
+      "eventType": "evidence",
+      "target": "suspect",
+      "action": "survival:investigate",
+      "requireEvidence": true,
+      "affect": "affect:anger",
+      "gain": 0.18,
+      "decay": 0.012
+    },
+    {
+      "id": "accuse-suspicion",
+      "eventType": "evidence",
+      "target": "suspect",
+      "action": "survival:accuse",
+      "requireEvidence": true,
+      "affect": "affect:anger",
+      "gain": 0.08,
+      "decay": 0.012
+    },
+    {
+      "id": "gratitude-repay",
+      "eventType": "gift",
+      "target": "from",
+      "action": "survival:repay",
+      "requireEvidence": false,
+      "affect": "affect:gratitude",
+      "gain": 0.2,
+      "decay": 0.01
+    },
+    {
+      "id": "accusation-safety",
+      "eventType": "accused",
+      "target": "from",
+      "action": "survival:guard",
+      "requireEvidence": false,
+      "affect": "affect:fear",
+      "gain": 0.12,
+      "decay": 0.02
+    }
+  ]
+}
