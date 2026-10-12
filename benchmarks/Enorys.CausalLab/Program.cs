@@ -17,6 +17,22 @@ internal static class Program {
         }
         throw new DirectoryNotFoundException("Cannot locate ENORYS data packs");
     }
+    private sealed class DecisionContext(ICausalGraphModule? graph):IDecisionContext {
+        public bool PlanningEnabled=>false;
+        public bool SocialEnabled=>true;
+        public bool LodEnabled=>false;
+        public bool AuditLod=>false;
+        public bool HasAffect=>false;
+        public bool HasCausalGraph=>graph!=null;
+        public int CognitiveTickStride=>1;
+        public ActionProposal? PlannedStep(AgentView actor,ObservationPacket obs)=>null;
+        public bool CanSpare(AgentView actor,string item)=>true;
+        public bool IsAffectNeutral(AgentView actor,long tick)=>true;
+        public bool NoPlanCanActivate(AgentView actor)=>true;
+        public double EmotionBias(AgentView actor,string action,string? target,long tick)=>0;
+        public double CausalBias(AgentView actor,string action,string? target,long tick)=>
+            graph?.ActionBias(actor,action,target,tick)??0;
+    }
     private static void Assert(bool condition,string label){
         if(!condition)throw new InvalidOperationException("CAUSAL_FAIL "+label);
         Console.WriteLine("CAUSAL_PASS "+label);
@@ -111,6 +127,23 @@ internal static class Program {
                 "one actor's private beliefs are never broadcast to other agents");
             Assert(graph.ActionBias(actor,"survival:investigate",null,10)>0,
                 "causal goal affects registered action utility");
+            var behavior=new SurvivalBehavior();
+            bool changed=false;
+            for(int fatigue=0;fatigue<=100;fatigue++){
+                var needs=new Dictionary<string,double>(StringComparer.Ordinal);
+                foreach(var (key,value) in actor.Needs)needs[key]=0;
+                needs["survival:fatigue"]=fatigue;
+                var candidateActor=actor with {Needs=needs};
+                var native=behavior.Choose(candidateActor,first,new DecisionContext(null));
+                var caused=behavior.Choose(candidateActor,first,new DecisionContext(graph));
+                if(native.Proposal!=caused.Proposal &&
+                   caused.Proposal.Kind=="survival:investigate"){
+                    changed=true;break;
+                }
+            }
+            Assert(changed,
+                "private causal goal can change an actual SurvivalBehavior choice at a near-tie");
+
 
             graph.RecordDecision(actor,new Decision(new ActionProposal(actor.Id,
                 "survival:investigate",Incident:"incident:water"),"deliberate",
