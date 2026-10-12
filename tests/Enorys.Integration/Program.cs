@@ -5,6 +5,7 @@ using Enorys.Core.Domain;
 using Enorys.Core.Modules;
 using Enorys.Core.Runtime;
 using Enorys.Domains.Survival;
+using Enorys.CustomBehavior;
 
 static class Program {
     static int Main(string[] args){
@@ -69,6 +70,14 @@ static class Program {
             Check(action.Accepted&&after.Inventory["survival:water"]==before.Inventory["survival:water"]-1
                 &&after.Needs["demo:focus"]<=before.Needs["demo:focus"],"custom effect executed without rebuilding Core");
             Check(extra.ResourcesBalanced,"custom action respects resource ledger");
+            var extraModuleHost=new ModuleHost();
+            extraModuleHost.Install(new FocusBehavior());
+            var pluginWorld=new SurvivalWorld(custom,new SurvivalConfig(22,24,3));
+            var pluginRun=new Engine(pluginWorld,custom,extraModuleHost,
+                new EngineOptions(Planning:false,Social:false,CognitiveLod:false)).Run();
+            Check(pluginRun.World.Actions.GetValueOrDefault("drink-tea")>0,
+                "external C# plugin executes custom decisions end-to-end");
+            Check(pluginRun.World.ResourcesBalanced,"plugin conserves resources");
             var rejected=extra.Execute(new ActionProposal(before.Id,"unknown:illegal-action"));
             Check(!rejected.Accepted&&extra.ResourcesBalanced,"unknown action rejected atomically");
             var all=Run(custom,host,days:3);
