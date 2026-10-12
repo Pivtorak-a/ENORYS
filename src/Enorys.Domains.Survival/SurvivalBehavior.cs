@@ -2,7 +2,7 @@ using Enorys.Abstractions;
 namespace Enorys.Domains.Survival;
 
 /// <summary>Example domain-specific decision plugin: none of these item names are in ENORYS Core.</summary>
-public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDecisionModule, IWakePolicy {
+public sealed partial class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDecisionModule, IWakePolicy, ICertifiedDecisionModule {
     private readonly IChoiceKernel? choiceKernel;
     public SurvivalBehavior(IChoiceKernel? choiceKernel=null){this.choiceKernel=choiceKernel;}
 
