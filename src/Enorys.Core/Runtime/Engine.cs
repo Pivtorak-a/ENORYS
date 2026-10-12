@@ -110,8 +110,11 @@ public sealed class Engine {
                         // Never skip over an active actor slot: physics/day effects
                         // are advanced in the authoritative World Adapter.
                         int untilNextActive=world.AgentCount-index;
+                        long untilEvent=world is IWorldScheduledStimuli schedule
+                            ? Math.Max(0,schedule.NextExternalStimulusTick-world.Tick)
+                            : long.MaxValue;
                         int slots=(int)Math.Min((long)untilNextActive,
-                            Math.Min(due-world.Tick,world.TotalTurns-world.Tick));
+                            Math.Min(untilEvent,Math.Min(due-world.Tick,world.TotalTurns-world.Tick)));
                         if(slots<=0)throw new InvalidOperationException("Pulse deadlock");
                         ((IWorldFastForward)world).AdvanceSlots(slots);
                         calendar.Skipped(slots);
