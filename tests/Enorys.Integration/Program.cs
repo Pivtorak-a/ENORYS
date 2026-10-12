@@ -7,6 +7,7 @@ using Enorys.Core.Runtime;
 using Enorys.Domains.Survival;
 using Enorys.CustomBehavior;
 using Enorys.Core.Social;
+using Enorys.Affect.ACM;
 
 static class Program {
     static int Main(string[] args){
@@ -17,6 +18,8 @@ static class Program {
         return args.FirstOrDefault() switch {
             "bench"=>Bench(root,domain,host,args),
             "simulate"=>Simulate(domain,host,args),
+            "bench-scheduler"=>BenchScheduler(domain,host),
+            "bench-acm"=>BenchAcm(root,domain),
             "test"=>Tests(root,domain,host),
             _=>Help()
         };
@@ -128,9 +131,177 @@ static class Program {
                     throw new Exception("Stress invariant failed on seed "+seed);
             }
             Check(true,"40 varied scarcity and replay seeds");
+
+
+            var viewWorld=new SurvivalWorld(d,new SurvivalConfig(73,24,2));
+            var oldView=viewWorld.GetPrivateAgent(0);
+            int oldWater=oldView.Inventory.GetValueOrDefault("survival:water");
+            var drinkResult=viewWorld.Execute(new ActionProposal(oldView.Id,"survival:drink"));
+            var currentView=viewWorld.GetPrivateAgent(0);
+            Check(drinkResult.Accepted && oldView.Inventory["survival:water"]==oldWater
+                && currentView.Inventory["survival:water"]==oldWater-1,
+                "immutable private snapshots retain old values after world mutation");
+            var oldDepot=viewWorld.Observe(0);
+            int oldSupply=oldDepot.Depot.GetValueOrDefault("survival:water");
+            var takeResult=viewWorld.Execute(new ActionProposal(oldView.Id,"survival:take",
+                Item:"survival:water"));
+            var newDepot=viewWorld.Observe(0);
+            Check(takeResult.Accepted&&oldDepot.Depot["survival:water"]==oldSupply
+                &&newDepot.Depot["survival:water"]==oldSupply-1,
+                "depot snapshot invalidated without altering previously issued observations");
+            Check(!viewWorld.HasPendingObservation(4),"inbox initially empty");
+            var helpResult=viewWorld.Execute(new ActionProposal("A001","survival:ask",
+                Item:"survival:water",Target:"A005"));
+            Check(helpResult.Accepted&&viewWorld.HasPendingObservation(4),
+                "world message signals wake without consuming inbox");
+            Check(viewWorld.Observe(4).Messages.Any(m=>m.Type=="request") &&
+                !viewWorld.HasPendingObservation(4),"woken NPC receives the message exactly once");
+            var wake=new WakeScheduler(3);
+            wake.Schedule(1,1,2);
+            Check(!wake.ShouldRun(1,4,false),"timed sleep skips routine cognition");
+            Check(wake.ShouldRun(1,4,true)&&wake.Interrupted==1,
+                "incoming private message interrupts a scheduled sleep");
+            Check(wake.ShouldRun(1,10,false),"due wake resumes normal decision cycle");
+            var reference=Run(d,host,seed:42,days:8);
+            var scheduledWorld=new SurvivalWorld(d,new SurvivalConfig(42,24,8,3,.55));
+            var scheduled=new Engine(scheduledWorld,d,host,
+                new EngineOptions(EventScheduling:true)).Run();
+            Check(scheduled.World.ResourcesBalanced&&scheduled.World.Turns==reference.World.Turns,
+                "scheduler preserves world-clock progression and resources");
+            Check(scheduled.SkippedDecisions>0&&scheduled.Deliberate<reference.Deliberate,
+                "sleep policy reduces expensive decision activations");
+            var scheduledWorld2=new SurvivalWorld(d,new SurvivalConfig(42,24,8,3,.55));
+            var scheduledRepeat=new Engine(scheduledWorld2,d,host,
+                new EngineOptions(EventScheduling:true)).Run();
+            Check(scheduled.TraceHash==scheduledRepeat.TraceHash,"scheduled execution reproducible");
+            var acm=new AffectiveMap(Path.Combine(root,"data-packs/affect-basic.json"));
+            var mindView=extra.GetPrivateAgent(0);
+            var signal=new ObservationPacket(10,1,.5,new Dictionary<string,int>(),
+                new Dictionary<string,bool>(),[],
+                [new Message("evidence","A002",Incident:"E1",Root:"R1",Suspect:"A003",
+                    LogLikelihood:Math.Log(8),Source:"eyewitness",Tick:10),
+                 new Message("gift","A003",Item:"survival:water",Tick:10)]);
+            acm.Receive(mindView,signal);
+            var emotional=acm.Inspect(mindView.Id,10);
+            Check(emotional.Any(x=>x.EmotionId=="affect:anger"&&x.TargetId=="A003")&&
+                  emotional.Any(x=>x.EmotionId=="affect:gratitude"&&x.TargetId=="A003"),
+                  "anger and gratitude coexist toward same target");
+            double initial=emotional.Where(x=>x.EmotionId=="affect:anger").Sum(x=>x.Intensity);
+            acm.Receive(mindView,signal);
+            double repeated=acm.Inspect(mindView.Id,10)
+                .Where(x=>x.EmotionId=="affect:anger").Sum(x=>x.Intensity);
+            Check(Math.Abs(initial-repeated)<1e-12,"rumor echo cannot duplicate emotional impulse");
+            var corrected=signal with {Tick=11,Messages=[new Message("retract","A002",Root:"R1",Tick:11)]};
+            acm.Receive(mindView,corrected);
+            var afterCorrection=acm.Inspect(mindView.Id,11);
+            Check(afterCorrection.Where(x=>x.EmotionId=="affect:anger").Sum(x=>x.Intensity)<initial*.5,
+                "belief correction reduces anger without erasing gratitude");
+            Check(afterCorrection.Any(x=>x.EmotionId=="affect:gratitude"&&x.Intensity>0),
+                "independent positive affect survives correction");
+            Check(double.IsFinite(acm.ActionBias(mindView,"survival:accuse","A003",11))&&
+                  Math.Abs(acm.ActionBias(mindView,"survival:accuse","A003",11))<=.6,
+                "mixed affect contributes bounded finite utility (fear may outweigh anger)");
+
+            var customAffect=new AffectiveMap(Path.Combine(root,"data-packs/affect-custom.json"));
+            customAffect.Receive(mindView,corrected);
+            Check(customAffect.Inspect(mindView.Id,11).Any(x=>x.EmotionId=="customaffect:relief"),
+                "custom emotion and event trigger loaded from JSON, no code edits");
+            Check(acm.Inspect(mindView.Id,60).All(x=>x.Intensity<=
+                afterCorrection.First(y=>y.EmotionId==x.EmotionId&&y.TargetId==x.TargetId&&y.EvidenceRoot==x.EvidenceRoot).Intensity),
+                "lazy emotional decay monotone without new evidence");
+
+            // Hidden objective truth is not part of an affect module's inputs.
+            var noMessage=corrected with {Tick=12,Messages=[]};
+            var beforeSilent=acm.Inspect(mindView.Id,12);
+            acm.Receive(mindView,noMessage);
+            Check(beforeSilent.SequenceEqual(acm.Inspect(mindView.Id,12)),
+                "unobserved world changes cannot inject emotions");
+            acm.ObserveOwnAction(mindView,new ActionProposal(mindView.Id,"survival:retract",
+                Target:"A003",Root:"R1"),11);
+            Check(acm.Inspect(mindView.Id,11).Any(x=>x.EmotionId=="affect:guilt"&&x.TargetId=="A003"),
+                "own correction may create separate guilt episode");
+            var affectHost=new ModuleHost();
+            affectHost.Install(new SurvivalBehavior());
+            affectHost.Install(new AffectiveMap(Path.Combine(root,"data-packs/affect-basic.json")));
+            var affectWorld=new SurvivalWorld(d,new SurvivalConfig(41,24,6,3,.5));
+            var affectRun=new Engine(affectWorld,d,affectHost,new EngineOptions()).Run();
+            Check(affectRun.World.ResourcesBalanced&&affectRun.World.Events>0,
+                "optional ACM integrates without compromising world material authority");
+            var affectOff=new ModuleHost();
+            affectOff.Install(new SurvivalBehavior());
+            Check(Run(d,affectOff,41,24,6).World.ResourcesBalanced,
+                "ACM module can be omitted without breaking core");
+            Check(true,"event wake and ACM acceptance suite");
             Console.WriteLine("RESULT integration tests PASSED");
             return 0;
         }catch(Exception e){Console.Error.WriteLine("RESULT integration tests FAILED: "+e);return 1;}
+    }
+
+
+    static int BenchAcm(string root,DomainRegistry d){
+        Console.WriteLine("ACM_ENV "+JsonSerializer.Serialize(new{
+            dotnet=Environment.Version.ToString(),
+            platform=System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+            cpus=Environment.ProcessorCount,runs=3,days=14,turnsPerDay=3}));
+        foreach(int agents in new[]{24,100,500})foreach(bool affectEnabled in new[]{false,true}){
+            var timings=new List<double>();var allocations=new List<double>();var episodes=new List<int>();
+            for(int i=0;i<3;i++){
+                var host=new ModuleHost();
+                host.Install(new SurvivalBehavior());
+                AffectiveMap? affect=null;
+                if(affectEnabled){
+                    affect=new AffectiveMap(Path.Combine(root,"data-packs/affect-basic.json"));
+                    host.Install(affect);
+                }
+                var world=new SurvivalWorld(d,new SurvivalConfig(300+i,agents,14,3,.55));
+                GC.Collect();GC.WaitForPendingFinalizers();GC.Collect();
+                long before=GC.GetTotalAllocatedBytes(true);
+                var watch=Stopwatch.StartNew();
+                var result=new Engine(world,d,host,new EngineOptions(CognitiveLod:false)).Run();
+                watch.Stop();
+                if(!result.World.ResourcesBalanced)throw new Exception("ACM resource balance failure");
+                timings.Add(watch.Elapsed.TotalMilliseconds);
+                allocations.Add((GC.GetTotalAllocatedBytes(true)-before)/(double)result.World.Turns);
+                episodes.Add(affect==null?0:Enumerable.Range(1,agents)
+                    .Sum(n=>affect.Inspect($"A{n:D3}",world.Tick).Count));
+            }
+            timings.Sort();
+            Console.WriteLine("ACM_RESULT "+JsonSerializer.Serialize(new{
+                agents,affectEnabled,medianMs=timings[1],
+                allocatedBytesPerTurn=allocations.Average(),
+                averageAffectiveEpisodes=episodes.Average()
+            }));
+        }
+        return 0;
+    }
+    static int BenchScheduler(DomainRegistry d,ModuleHost h){
+        Console.WriteLine("SCHEDULER_ENV "+JsonSerializer.Serialize(new{
+            framework=Environment.Version.ToString(),platform=System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+            cpus=Environment.ProcessorCount,days=14,turnsPerDay=3,repeats=5
+        }));
+        foreach(int n in new[]{24,100,500})foreach(bool scheduled in new[]{false,true}){
+            var timings=new List<double>();var allocations=new List<double>();var skips=new List<long>();
+            Run(d,h,42,n,days:3);
+            for(int seed=1000;seed<1005;seed++){
+                GC.Collect();GC.WaitForPendingFinalizers();GC.Collect();
+                var before=GC.GetTotalAllocatedBytes(true);
+                var sw=Stopwatch.StartNew();
+                var world=new SurvivalWorld(d,new SurvivalConfig(seed,n,14,3,.55));
+                var result=new Engine(world,d,h,new EngineOptions(EventScheduling:scheduled)).Run();
+                sw.Stop();
+                if(!result.World.ResourcesBalanced)throw new Exception("bad scheduler balance");
+                timings.Add(sw.Elapsed.TotalMilliseconds);
+                allocations.Add((GC.GetTotalAllocatedBytes(true)-before)/(double)(n*14*3));
+                skips.Add(result.SkippedDecisions);
+            }
+            timings.Sort();
+            Console.WriteLine("SCHEDULER_RESULT "+JsonSerializer.Serialize(new{
+                agents=n,scheduled,turns=n*14*3,medianMs=timings[2],
+                minMs=timings[0],maxMs=timings[^1],
+                allocatedBytesPerTurn=allocations.Average(),meanSkipped=skips.Average()
+            }));
+        }
+        return 0;
     }
     static int Bench(string root,DomainRegistry d,ModuleHost host,string[] args){
         int[] sizes=[24,50,100,500];int repetitions=5;

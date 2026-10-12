@@ -2,11 +2,17 @@ using Enorys.Abstractions;
 namespace Enorys.Domains.Survival;
 
 /// <summary>Example domain-specific decision plugin: none of these item names are in ENORYS Core.</summary>
-public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDecisionModule {
+public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDecisionModule, IWakePolicy {
     const string S="survival:";
     public string Id=>"survival:behavior-module";
     public string ModuleId=>Id;
-    public void Register(IModuleRegistry registry)=>registry.AddDecision(this);
+    public void Register(IModuleRegistry registry){registry.AddDecision(this);registry.AddWakePolicy(this);}
+    public int SleepTurns(AgentView a,ObservationPacket p,Decision d,ActionResult result){
+        if(!result.Accepted||p.Messages.Count>0||a.Evidence.Any(x=>x.Active))return 0;
+        if(d.Proposal.Kind=="survival:wait" && a.Health>65)return 1;
+        if(d.Proposal.Kind=="survival:sleep" && a.Health>55 && a.Needs.GetValueOrDefault("survival:thirst")<60)return 1;
+        return 0;
+    }
     static int I(AgentView a,string item)=>a.Inventory.GetValueOrDefault(S+item);
     static double N(AgentView a,string need)=>a.Needs.GetValueOrDefault(S+need)/100;
     static bool Source(ObservationPacket p,string item)=>p.SourcesKnown.GetValueOrDefault(S+item);
@@ -91,8 +97,12 @@ public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDeci
             }
         }
         var selected=candidates[0];
-        foreach(var x in candidates.Skip(1))if(x.Utility>selected.Utility)selected=x;
-        return new Decision(selected.Proposal,"deliberate",selected.Reason,candidates.Count,selected.Utility);
+        double best=selected.Utility+ctx.EmotionBias(a,selected.Proposal.Kind,selected.Proposal.Target,p.Tick);
+        foreach(var x in candidates.Skip(1)){
+            double score=x.Utility+ctx.EmotionBias(a,x.Proposal.Kind,x.Proposal.Target,p.Tick);
+            if(score>best){selected=x;best=score;}
+        }
+        return new Decision(selected.Proposal,"deliberate",selected.Reason,candidates.Count,best);
     }
     private static (string Incident,string Suspect,double Probability,string Root,double LogLikelihood)? FindSuspicion(AgentView a,long tick){
         (string Incident,string Suspect,double Probability,string Root,double LogLikelihood)? result=null;
@@ -108,7 +118,7 @@ public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDeci
     }
 
     public Decision? TryFastDecision(AgentView a,ObservationPacket p,IDecisionContext ctx){
-        if(a.Health<45||a.Infection>45||a.Injury>50||a.PlanGoal==null)return null;
+        if(ctx.HasAffect || a.Health<45||a.Infection>45||a.Injury>50||a.PlanGoal==null)return null;
         if(ctx.SocialEnabled && (a.Evidence.Any(x=>x.Active)||a.Requests.Count>0||
              a.Debts.Any(x=>x.Value>0)||a.PendingCorrections.Count>0||
              (p.Nearby.Count>0&&(N(a,"thirst")>.56&&I(a,"water")==0||

@@ -1,4 +1,5 @@
 using Enorys.Abstractions;
+using System.Collections.ObjectModel;
 using Enorys.Core.Domain;
 using Enorys.Core.Runtime;
 
@@ -14,17 +15,26 @@ internal sealed class Survivor {
     public double Health=95,Injury,Infection;
     public required Traits Traits;
     public Dictionary<string,int> Inv=new(StringComparer.Ordinal);
+    public AgentView? CachedView;
     public Dictionary<string,double> Needs=new(StringComparer.Ordinal);
     public HashSet<string> Acted=new(StringComparer.Ordinal);
 }
 
-public sealed class SurvivalWorld : IWorldAdapter {
+public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal {
     const string S="survival:";
     public readonly DomainRegistry Domain;
     public readonly SurvivalConfig Config;
     private readonly Survivor[] people;
     private readonly Dictionary<string,Survivor> byId;
     private readonly Dictionary<string,int> depot,sources,initial,consumed,converted;
+    private IReadOnlyDictionary<string,int>? depotView;
+    private IReadOnlyDictionary<string,bool>? sourcesView;
+    private IReadOnlyList<string>[] peersView=[];
+    private void InvalidatePublicViews(bool depotChanged=false,bool sourcesChanged=false,bool peerChanged=false){
+        if(depotChanged)depotView=null;
+        if(sourcesChanged)sourcesView=null;
+        if(peerChanged)peersView=[];
+    }
     private readonly List<WorldEvent> events=new();
     private readonly Dictionary<string,List<Message>> inbox=new(StringComparer.Ordinal);
     private readonly Dictionary<string,int> actions=new(StringComparer.Ordinal);
@@ -87,21 +97,38 @@ public sealed class SurvivalWorld : IWorldAdapter {
         return CounterRandom.Sample((ulong)Config.Seed,(ulong)actor+1,(ulong)clock+1,(ulong)channel);
     }
     public bool IsAlive(int index)=>people[index].Alive;
+    public bool HasPendingObservation(int index)=>inbox[people[index].Id].Count>0;
     public AgentView GetPrivateAgent(int index){
         var a=people[index];
-        return new AgentView(a.Id,a.Zone,a.Group,a.Alive,
-           new Dictionary<string,int>(a.Inv),new Dictionary<string,double>(a.Needs),
-           a.Traits,a.Health,a.Injury,a.Infection,null,[],new Dictionary<string,double>(),new Dictionary<string,int>(),[],[],new HashSet<string>(),new HashSet<string>(),[]);
+        if(a.CachedView!=null)return a.CachedView;
+        a.CachedView=new AgentView(a.Id,a.Zone,a.Group,a.Alive,
+            new ReadOnlyDictionary<string,int>(new Dictionary<string,int>(a.Inv)),
+            new ReadOnlyDictionary<string,double>(new Dictionary<string,double>(a.Needs)),
+            a.Traits,a.Health,a.Injury,a.Infection,null,[],
+            new ReadOnlyDictionary<string,double>(new Dictionary<string,double>()),
+            new ReadOnlyDictionary<string,int>(new Dictionary<string,int>()),[],[],
+            new HashSet<string>(),new HashSet<string>(),[]);
+        return a.CachedView;
+    }
+    private void BuildPeers(){
+        peersView=new IReadOnlyList<string>[people.Length];
+        for(int i=0;i<people.Length;i++){
+            var a=people[i];
+            peersView[i]=Array.AsReadOnly(people.Where(p=>p.Alive&&p.Zone==a.Zone&&p.Id!=a.Id)
+                .Select(p=>p.Id).ToArray());
+        }
     }
     public ObservationPacket Observe(int index){
-        var a=people[index];var nearby=people.Where(p=>p.Alive&&p.Zone==a.Zone&&p.Id!=a.Id).Select(p=>p.Id).ToArray();
-        var messages=inbox[a.Id].ToArray();inbox[a.Id].Clear();
-        var known=new Dictionary<string,bool>{
+        var a=people[index];
+        if(peersView.Length!=people.Length)BuildPeers();
+        depotView??=new ReadOnlyDictionary<string,int>(new Dictionary<string,int>(depot));
+        sourcesView??=new ReadOnlyDictionary<string,bool>(new Dictionary<string,bool>{
             [S+"raw_food"]=Quantity(sources,S+"raw_food")>0,
             [S+"dirty_water"]=Quantity(sources,S+"dirty_water")>0,
             [S+"wood"]=Quantity(sources,S+"wood")>0
-        };
-        return new ObservationPacket(tick,day,Config.Cold,new Dictionary<string,int>(depot),known,nearby,messages);
+        });
+        var messages=inbox[a.Id].ToArray();inbox[a.Id].Clear();
+        return new ObservationPacket(tick,day,Config.Cold,depotView,sourcesView,peersView[index],messages);
     }
     void Send(string? to,Message message){
         if(to!=null&&byId.TryGetValue(to,out var a)&&a.Alive)inbox[to].Add(message);
@@ -192,6 +219,11 @@ public sealed class SurvivalWorld : IWorldAdapter {
               }
               break;
         }
+        // Mutated views are rebuilt lazily; existing packets stay immutable.
+        a.CachedView=null;
+        if(k is "give" or "repay")target!.CachedView=null;
+        if(k is "take" or "build_latrine")InvalidatePublicViews(depotChanged:true);
+        if(k is "gather_food" or "collect_water" or "gather_wood" or "scavenge")InvalidatePublicViews(sourcesChanged:true);
         events.Add(evt);
         actions[k]=actions.GetValueOrDefault(k)+1;
         return new ActionResult(true,"accepted",evt);
@@ -200,7 +232,9 @@ public sealed class SurvivalWorld : IWorldAdapter {
         tick++;
         if(tick>0&&tick%(people.Length*Config.TurnsPerDay)==0){
             day++;
+            bool anyDeath=false;
             foreach(var a in people.Where(p=>p.Alive)){
+                a.CachedView=null;
                 foreach(var n in Domain.Needs.Values)a.Needs[n.Id]=Limit(a.Needs[n.Id]+n.Daily);
                 a.Needs[S+"cold"]=Limit(Need(a,"cold")+(Config.Cold>.7?11:4)-
                     (Can(a,"coat")?5:0)-(Can(a,"shelter")?7:0));
@@ -210,8 +244,9 @@ public sealed class SurvivalWorld : IWorldAdapter {
                 if(a.Infection>0)a.Health-=a.Infection*.03;
                 if(Need(a,"hygiene")>85)a.Infection=Limit(a.Infection+3);
                 a.Health=Limit(a.Health);
-                if(a.Health<=0)a.Alive=false;
+                if(a.Health<=0){a.Alive=false;anyDeath=true;}
             }
+            if(anyDeath)InvalidatePublicViews(peerChanged:true);
         }
     }
     static bool Can(Survivor a,string id)=>Quantity(a.Inv,S+id)>0;
