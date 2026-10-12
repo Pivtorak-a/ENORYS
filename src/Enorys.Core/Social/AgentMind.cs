@@ -1,9 +1,34 @@
 using Enorys.Abstractions;
+using System.Collections.Frozen;
+using System.Collections.ObjectModel;
 using Enorys.Core.Planning;
 namespace Enorys.Core.Social;
 
 /// <summary>Agent-private state; never holds a reference to the authoritative world.</summary>
+public sealed record AgentMindSnapshot(
+    IReadOnlyList<PrivateEvidence> Evidence,
+    IReadOnlyDictionary<string,double> Trust,
+    IReadOnlyDictionary<string,int> Debts,
+    IReadOnlyList<HelpRequest> Requests,
+    IReadOnlySet<string> Acted,
+    IReadOnlySet<string> Reported,
+    IReadOnlyList<RetractionRequest> Corrections);
+
 public sealed class AgentMind {
+    private AgentMindSnapshot? cachedSnapshot;
+    public AgentMindSnapshot GetSnapshot(){
+        if(cachedSnapshot!=null)return cachedSnapshot;
+        cachedSnapshot=new AgentMindSnapshot(
+            Array.AsReadOnly(Evidence.Values.ToArray()),
+            new ReadOnlyDictionary<string,double>(new Dictionary<string,double>(Trust)),
+            new ReadOnlyDictionary<string,int>(new Dictionary<string,int>(Debts)),
+            Array.AsReadOnly(Requests.ToArray()),
+            Acted.ToFrozenSet(StringComparer.Ordinal),
+            Reported.ToFrozenSet(StringComparer.Ordinal),
+            Array.AsReadOnly(Corrections.Select(x=>new RetractionRequest(x.Root,x.To)).ToArray()));
+        return cachedSnapshot;
+    }
+
     public Plan? Plan;
     public readonly Dictionary<string,PrivateEvidence> Evidence=new(StringComparer.Ordinal);
     public readonly Dictionary<string,double> Trust=new(StringComparer.Ordinal);
@@ -16,7 +41,7 @@ public sealed class AgentMind {
     public long LastInboxTick=-1;
 
     public void Ingest(ObservationPacket packet){
-        if(packet.Messages.Count>0)LastInboxTick=packet.Tick;
+        if(packet.Messages.Count>0){LastInboxTick=packet.Tick;cachedSnapshot=null;}
         foreach(var m in packet.Messages){
             switch(m.Type){
                 case "evidence":
@@ -66,6 +91,9 @@ public sealed class AgentMind {
         return best;
     }
     public void OnAccepted(ActionProposal p,int day,long tick){
+        if(p.Kind is "survival:ask" or "survival:investigate" or "survival:accuse"
+            or "survival:tell" or "survival:retract" or "survival:repay" or "survival:give")
+            cachedSnapshot=null;
         switch(p.Kind){
             case "survival:ask":Acted.Add("ask:"+p.Item+":"+day);break;
             case "survival:investigate":Acted.Add("investigate:"+p.Incident);break;
