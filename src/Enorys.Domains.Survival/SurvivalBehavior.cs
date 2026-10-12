@@ -71,6 +71,10 @@ public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDeci
             if(requested!=null&&p.Nearby.Count>0&&!a.Acted.Contains("ask:"+S+requested+":"+p.Day))
                 candidates.Add(C(a,"ask",1.8+1.6*(requested=="water"?w:h)+.5*t.Sociability,
                     "request assistance",S+requested,p.Nearby[0]));
+            var correction=a.PendingCorrections.FirstOrDefault(x=>p.Nearby.Contains(x.Recipient)&&
+                !a.Reported.Contains("retract:"+x.Root+":"+x.Recipient));
+            if(correction!=null)candidates.Add(C(a,"retract",3.2,"correct false report",
+                target:correction.Recipient,root:correction.Root));
             var suspicion=FindSuspicion(a,p.Tick);
             if(suspicion!=null&&suspicion.Value.Probability>.4){
                 var s=suspicion.Value;
@@ -106,7 +110,7 @@ public sealed class SurvivalBehavior : IEnorysModule, IDecisionModule, IFastDeci
     public Decision? TryFastDecision(AgentView a,ObservationPacket p,IDecisionContext ctx){
         if(a.Health<45||a.Infection>45||a.Injury>50||a.PlanGoal==null)return null;
         if(ctx.SocialEnabled && (a.Evidence.Any(x=>x.Active)||a.Requests.Count>0||
-             a.Debts.Any(x=>x.Value>0)||
+             a.Debts.Any(x=>x.Value>0)||a.PendingCorrections.Count>0||
              (p.Nearby.Count>0&&(N(a,"thirst")>.56&&I(a,"water")==0||
                                 N(a,"hunger")>.6&&I(a,"food")==0))))return null;
         string goal=a.PlanGoal;
