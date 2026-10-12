@@ -112,6 +112,7 @@ public sealed class Engine {
             var result=world.Execute(choice.Proposal);
             if(result.Accepted){
                 mind.OnAccepted(choice.Proposal,obs.Day,obs.Tick);
+                foreach(var affect in affects)affect.ObserveOwnAction(actor,choice.Proposal,obs.Tick);
                 if(mind.Plan is { } p&&!p.Finished &&p.Steps[p.Index].Kind==choice.Proposal.Kind){
                     p.Index++;
                     if(p.Finished){mind.Plan=null;plansCompleted++;}
