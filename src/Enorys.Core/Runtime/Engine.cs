@@ -77,7 +77,7 @@ public sealed class Engine {
             var actor=PrivateSnapshot(world.GetPrivateAgent(index),obs,mind);
             var ctx=new Context(this,mind);
             var before=System.Diagnostics.Stopwatch.GetTimestamp();
-            Decision choice;
+            Enorys.Abstractions.Decision choice;
             if(options.CognitiveLod&&decision is IFastDecisionModule fast
                 &&mind.Plan!=null && mind.LastInboxTick!=obs.Tick){
                 var maybe=fast.TryFastDecision(actor,obs,ctx);
@@ -105,7 +105,7 @@ public sealed class Engine {
             history.Add($"{obs.Tick}|{actor.Id}|{choice.Mode}|{choice.Proposal.Kind}|{choice.Proposal.Item}|{choice.Proposal.Target}|{result.Accepted}");
             world.Advance();
         }
-        var elapsed=System.Diagnostics.Stopwatch.GetTimestamp()-start;
+
         var bytes=SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n",history)));
         var wm=world.GetMetrics() with {CandidateChecks=candidateChecks,
             AutoDecisions=automatic,Deliberations=deliberate,PlansCompleted=plansCompleted};
