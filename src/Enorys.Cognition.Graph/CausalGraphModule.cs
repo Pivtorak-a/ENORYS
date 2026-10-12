@@ -20,7 +20,7 @@ public sealed class CausalGraphModule : IEnorysModule,ICausalGraphModule {
         public readonly Queue<string> Decisions=new();
         public long Revision,Recomputed,Unchanged,Invalidated;
     }
-    private readonly CausalRule[] rules;
+    private readonly Dictionary<string,CausalRule[]> byEvent;
     private readonly int maxRoots,maxDecisions;
     private readonly double biasScale;
     private readonly Dictionary<string,State> agents=new(StringComparer.Ordinal);
@@ -34,7 +34,8 @@ public sealed class CausalGraphModule : IEnorysModule,ICausalGraphModule {
         if(!double.IsFinite(biasScale)||biasScale<0||biasScale>1)
             throw new ArgumentOutOfRangeException(nameof(biasScale));
         var loaded=CausalRules.Load(packs.ToArray());
-        rules=loaded.Rules;
+        byEvent=loaded.Rules.GroupBy(r=>r.EventType,StringComparer.Ordinal)
+            .ToDictionary(g=>g.Key,g=>g.ToArray(),StringComparer.Ordinal);
         maxRoots=loaded.MaxRoots;
         maxDecisions=loaded.MaxDecisions;
         this.biasScale=biasScale;
@@ -117,8 +118,7 @@ public sealed class CausalGraphModule : IEnorysModule,ICausalGraphModule {
                 }
                 continue;
             }
-            var matches=rules.Where(rule=>rule.EventType==message.Type).ToArray();
-            if(matches.Length==0)continue;
+            if(!byEvent.TryGetValue(message.Type,out var matches))continue;
             if(message.Type=="evidence"&&!actor.Evidence.Any(e=>
                    e.Root==root&&e.Active&&e.Suspect==message.Suspect))continue;
             if(!state.SeenEvents.Add(root)){state.Unchanged++;continue;}
@@ -148,9 +148,9 @@ public sealed class CausalGraphModule : IEnorysModule,ICausalGraphModule {
                 string parent=beliefId;
                 double emotionStrength=0;
                 if(rule.Affect!=null){
-                    emotionStrength=privateAffect.Where(e=>e.EvidenceRoot==root&&
-                            e.TargetId==subject&&e.EmotionId==rule.Affect)
-                        .Sum(e=>e.Intensity);
+                    foreach(var e in privateAffect)
+                        if(e.EvidenceRoot==root&&e.TargetId==subject&&e.EmotionId==rule.Affect)
+                            emotionStrength+=e.Intensity;
                     if(emotionStrength>0){
                         string affectId=Identity(actor.Id,root,rule.Id,"affect");
                         Upsert(state,new CausalNode(affectId,actor.Id,root,"affect",
@@ -188,11 +188,16 @@ public sealed class CausalGraphModule : IEnorysModule,ICausalGraphModule {
         ActionResult outcome,long cognitiveTick){
         if(!agents.TryGetValue(actor.Id,out var state)||
            !state.GoalIndex.TryGetValue(decision.Proposal.Kind,out var ids))return;
-        var active=ids.Select(id=>state.Nodes[id])
-            .Where(g=>g.Active&&(decision.Proposal.Target==null||
-                g.Subject==decision.Proposal.Target))
-            .OrderByDescending(g=>g.Strength).ThenBy(g=>g.Id,StringComparer.Ordinal)
-            .FirstOrDefault();
+        CausalNode? active=null;
+        foreach(string candidateId in ids){
+            var g=state.Nodes[candidateId];
+            if(!g.Active||(decision.Proposal.Target!=null&&
+                g.Subject!=decision.Proposal.Target))continue;
+            if(active==null||g.Strength>active.Strength||
+               (g.Strength==active.Strength &&
+                StringComparer.Ordinal.Compare(g.Id,active.Id)<0))
+                active=g;
+        }
         if(active==null)return;
         string idNew=Identity(actor.Id,active.Root,"decision",
             cognitiveTick.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -204,6 +209,34 @@ public sealed class CausalGraphModule : IEnorysModule,ICausalGraphModule {
         AddEdge(state,active.Id,idNew,outcome.Accepted?"motivated-action":"rejected-proposal");
         state.Decisions.Enqueue(idNew);
         Prune(state);
+    }
+    public CausalExplanation Explain(string agentId,string decisionNodeId){
+        if(!agents.TryGetValue(agentId,out var state)||
+           !state.Nodes.TryGetValue(decisionNodeId,out var selected)||
+           selected.AgentId!=agentId||selected.Stage!="decision")
+            return new CausalExplanation(agentId,decisionNodeId,[],[],false);
+        var incoming=state.Edges.ToLookup(e=>e.To,StringComparer.Ordinal);
+        var frontier=new Queue<string>();
+        var seen=new HashSet<string>(StringComparer.Ordinal);
+        var links=new List<CausalEdge>();
+        frontier.Enqueue(decisionNodeId);
+        bool reached=false;
+        while(frontier.Count>0){
+            var id=frontier.Dequeue();
+            if(!seen.Add(id))continue;
+            if(!state.Nodes.TryGetValue(id,out var node))continue;
+            if(node.Stage=="observation")reached=true;
+            foreach(var edge in incoming[id].OrderBy(e=>e.From,StringComparer.Ordinal)){
+                links.Add(edge);
+                frontier.Enqueue(edge.From);
+            }
+        }
+        return new CausalExplanation(agentId,decisionNodeId,
+            Array.AsReadOnly(seen.Select(id=>state.Nodes[id])
+                .OrderBy(x=>x.Stage,StringComparer.Ordinal).ThenBy(x=>x.Id,StringComparer.Ordinal)
+                .ToArray()),
+            Array.AsReadOnly(links.OrderBy(e=>e.From,StringComparer.Ordinal)
+                .ThenBy(e=>e.To,StringComparer.Ordinal).ToArray()),reached);
     }
     public CausalSnapshot Inspect(string agentId){
         if(!agents.TryGetValue(agentId,out var state))
