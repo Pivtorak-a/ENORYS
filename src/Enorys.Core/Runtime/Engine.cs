@@ -9,7 +9,7 @@ namespace Enorys.Core.Runtime;
 
 public sealed record EngineOptions(bool Planning=true,bool Social=true,bool CognitiveLod=true,bool AuditLod=false,bool EventScheduling=false,
     int HybridActiveAgents=0,int BackgroundMaximumRounds=9,
-    int BackgroundRoundsPerDay=3,bool CaptureHistory=true);
+    int BackgroundRoundsPerDay=3,bool CaptureHistory=true,bool NormalizeCognitiveClock=false);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
     string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}
@@ -17,6 +17,7 @@ public sealed record EngineResults(WorldMetrics World,long Automatic,long Delibe
     public long FastForwardCalls {get;init;} public long MessagesProcessed {get;init;}
     public long AffectMessagesProcessed {get;init;} public long MemoryEvidenceProcessed {get;init;}
     public int CalendarHighWater {get;init;}
+    public long CognitiveWakeVetoes {get;init;}
 }
 /// <summary>Core owns cognition, World Adapter owns truth and material state.</summary>
 public sealed class Engine {
@@ -32,6 +33,9 @@ public sealed class Engine {
     private readonly List<int> dirtyBuffer=new();
     private long backgroundDecisions,activeDecisions,fastForwardCalls,messagesProcessed,affectMessagesProcessed,memoryEvidenceProcessed;
     private readonly IReadOnlyList<IAffectiveModule> affects;
+    private readonly IReadOnlyList<ICognitiveWakeSignal> wakeContributors;
+    private readonly int cognitiveTickStride;
+    private long cognitiveWakeVetoes;
     private long automatic,deliberate,candidateChecks,decisionTicks;
     private int plansCompleted,plansAbandoned,divergences;
     private readonly List<string> history=new();
@@ -42,8 +46,9 @@ public sealed class Engine {
         public bool LodEnabled=>engine.options.CognitiveLod;
         public bool AuditLod=>engine.options.AuditLod;
         public bool HasAffect=>engine.affects.Count>0;
+        public int CognitiveTickStride=>engine.cognitiveTickStride;
         public double EmotionBias(AgentView agent,string actionKind,string? target,long tick){
-            double sum=0;foreach(var module in engine.affects)sum+=module.ActionBias(agent,actionKind,target,tick);
+            double sum=0;foreach(var module in engine.affects)sum+=module.ActionBias(agent,actionKind,target,tick/engine.cognitiveTickStride);
             return Math.Clamp(sum,-1,1);
         }
         public ActionProposal? PlannedStep(AgentView a,ObservationPacket obs){
@@ -70,6 +75,8 @@ public sealed class Engine {
         minds=Enumerable.Range(0,world.AgentCount).Select(_=>new AgentMind()).ToArray();
         wakePolicy=host.WakePolicies.FirstOrDefault();
         affects=host.AffectiveModules;
+        wakeContributors=host.CognitiveWakeSignals;
+        cognitiveTickStride=options.NormalizeCognitiveClock?world.AgentCount:1;
         if(options.EventScheduling && wakePolicy!=null)scheduler=new WakeScheduler(world.AgentCount);
         deadlinePolicy=host.BackgroundDeadline;
         if(options.HybridActiveAgents>0){
@@ -143,7 +150,7 @@ public sealed class Engine {
             memoryEvidenceProcessed+=obs.Messages.Count(m=>m.Type is "evidence" or "retract");
             var actor=PrivateSnapshot(world.GetPrivateAgent(index),obs,mind);
             if(obs.Messages.Count>0)foreach(var affect in affects){
-                affect.Receive(actor,obs);
+                affect.Receive(actor,obs with {Tick=obs.Tick/cognitiveTickStride});
                 affectMessagesProcessed+=obs.Messages.Count;
             }
             var ctx=new Context(this,mind);
@@ -172,7 +179,7 @@ public sealed class Engine {
             var result=world.Execute(choice.Proposal);
             if(result.Accepted){
                 mind.OnAccepted(choice.Proposal,obs.Day,obs.Tick);
-                foreach(var affect in affects)affect.ObserveOwnAction(actor,choice.Proposal,obs.Tick);
+                foreach(var affect in affects)affect.ObserveOwnAction(actor,choice.Proposal,obs.Tick/cognitiveTickStride);
                 if(mind.Plan is { } p&&!p.Finished &&p.Steps[p.Index].Kind==choice.Proposal.Kind){
                     p.Index++;
                     if(p.Finished){mind.Plan=null;plansCompleted++;}
@@ -189,6 +196,14 @@ public sealed class Engine {
                     rounds=deadlinePolicy!.NextWakeRounds(updated,obs,
                         options.BackgroundRoundsPerDay,
                         options.BackgroundMaximumRounds);
+                }
+                foreach(var module in wakeContributors){
+                    int allowed=module.MaximumSleepRounds(actor.Id,
+                        world.Tick/cognitiveTickStride,options.BackgroundMaximumRounds);
+                    if(allowed<1||allowed>options.BackgroundMaximumRounds)
+                        throw new InvalidOperationException("Cognitive wake signal exceeded declared range");
+                    if(allowed<rounds)cognitiveWakeVetoes++;
+                    rounds=Math.Min(rounds,allowed);
                 }
                 calendar.AfterTurn(index,world.Tick,rounds);
             }
@@ -211,7 +226,8 @@ public sealed class Engine {
                 MessagesProcessed=messagesProcessed,
                 AffectMessagesProcessed=affectMessagesProcessed,
                 MemoryEvidenceProcessed=memoryEvidenceProcessed,
-                CalendarHighWater=calendar?.HighWater??0
+                CalendarHighWater=calendar?.HighWater??0,
+                CognitiveWakeVetoes=cognitiveWakeVetoes
             };
     }
 }
