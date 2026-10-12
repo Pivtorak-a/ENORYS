@@ -277,10 +277,23 @@ internal static class Program {
                     }));
                 }
             }
+            var populationTest=new Case(42,5500,500,3,false,1,true,.08,.72,Trace:true);
+            var largeControl=Run(root,domain,populationTest);
+            var largeOptimized=Run(root,domain,populationTest with {
+                Certified=true,Audit=true,Adaptive=true
+            });
+            Check(largeControl.Outcome.TraceHash==largeOptimized.Outcome.TraceHash&&
+                  largeControl.Outcome.World.Events==largeOptimized.Outcome.World.Events&&
+                  largeControl.Outcome.World.AverageHealth==largeOptimized.Outcome.World.AverageHealth&&
+                  largeOptimized.Outcome.World.ResourcesBalanced,
+                  "5500-agent full world exact action-trace, health and resources parity");
+            Check(largeOptimized.Outcome.CertificateAudits>0&&
+                  largeOptimized.Outcome.CertificateThrottled>0,
+                  "large-world adaptive mode exercises audited proofs and safe throttling");
             Check(successes>0,"certified policy used for actual NPC decisions, not only fallbacks");
             Check(rejections>0,"certificate rejects contexts with unproven dependencies");
             Console.WriteLine("CERT_TESTS PASS "+JsonSerializer.Serialize(new{
-                testWorlds=96,successes,rejections
+                testWorlds=97,successes,rejections
             }));
             return 0;
         }catch(Exception error){
