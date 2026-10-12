@@ -1,7 +1,7 @@
 name: Modular .NET Runtime
 on:
   push:
-    branches: [main, develop, feature/net10-modular-runtime-v05]
+    branches: [main, develop, feature/net10-modular-runtime-v05, feature/v06-wake-acm]
   pull_request:
     branches: [main]
 permissions:
