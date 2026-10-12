@@ -4,6 +4,9 @@
 **Date:** 2026-10-12
 **Context:** ENORYS v0.4 JS sandbox and the previously audited NOEMYN Cognitive PoC v0.1.1 specification.
 
+
+> **Extensibility requirement:** ACM is a replaceable extension, not a mandatory built-in class. Emotion definitions use namespaced IDs and externally authored data packs, while third-party appraisal providers implement versioned interfaces. Core must not hard-code a closed list of `EmotionKind` values. See [ADR-0003 — Data-Driven, Modular and Extensible ENORYS](ADR-0003-EXTENSIBLE-MODULES.md). This design is proposed, not implemented.
+
 ## Decision
 
 The **Affective Cognitive Map** is a first-class, domain-independent part of the cognitive engine, not five independent meters such as fear, anger or happiness. It represents **why an emotion exists**, **its target**, **what belief supports it**, **how it changes** and **which goals it affects**.
