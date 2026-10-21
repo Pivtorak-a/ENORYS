@@ -11,7 +11,8 @@ public sealed record EngineOptions(bool Planning=true,bool Social=true,bool Cogn
     int HybridActiveAgents=0,int BackgroundMaximumRounds=9,
     int BackgroundRoundsPerDay=3,bool CaptureHistory=true,bool NormalizeCognitiveClock=false,
     bool HybridUseTimingWheel=true,bool CertifiedDecisions=false,bool AuditCertificates=false,
-    bool AdaptiveCertificateAdmission=false);
+    bool AdaptiveCertificateAdmission=false,bool TrackPrivateBeliefs=false,
+    int MaxBeliefRevisionsPerAgent=64);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
     string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}
@@ -26,10 +27,12 @@ public sealed record EngineResults(WorldMetrics World,long Automatic,long Delibe
     public long CertificateThrottled {get;init;}
     public long CausalObservations {get;init;}
     public long CausalDecisions {get;init;}
+    public IReadOnlyList<PrivateBeliefRevision> BeliefRevisions {get;init;}=[];
 }
 /// <summary>Core owns cognition, World Adapter owns truth and material state.</summary>
 public sealed class Engine {
     private readonly IWorldAdapter world;
+    private readonly PrivateBeliefTimeline? beliefTimeline;
     private readonly AgentMind[] minds;
     private readonly Planner planner;
     private readonly IDecisionModule decision;
@@ -108,6 +111,8 @@ public sealed class Engine {
     private readonly DomainRegistry plannerDomain;
     public Engine(IWorldAdapter world,DomainRegistry domain,ModuleHost host,EngineOptions? opts=null){
         this.world=world;plannerDomain=domain;options=opts??new();
+        if(options.TrackPrivateBeliefs)
+            beliefTimeline=new PrivateBeliefTimeline(options.MaxBeliefRevisionsPerAgent);
         planner=new Planner(domain);
         decision=host.Decisions.FirstOrDefault()??throw new InvalidOperationException("No decision module installed");
         minds=Enumerable.Range(0,world.AgentCount).Select(_=>new AgentMind()).ToArray();
@@ -196,6 +201,7 @@ public sealed class Engine {
             messagesProcessed+=obs.Messages.Count;
             memoryEvidenceProcessed+=obs.Messages.Count(m=>m.Type is "evidence" or "retract");
             var actor=PrivateSnapshot(world.GetPrivateAgent(index),obs,mind);
+            beliefTimeline?.Observe(actor,obs);
             if(obs.Messages.Count>0)foreach(var affect in affects){
                 affect.Receive(actor,obs with {Tick=obs.Tick/cognitiveTickStride});
                 affectMessagesProcessed+=obs.Messages.Count;
@@ -335,7 +341,8 @@ public sealed class Engine {
                 CertificateAbstentions=certificateAbstentions,
                 CertificateAudits=certificateAudits,
                 CertificateThrottled=certificateThrottled,
-                CausalObservations=causalObservations,CausalDecisions=causalDecisions
+                CausalObservations=causalObservations,CausalDecisions=causalDecisions,
+                BeliefRevisions=beliefTimeline?.InspectAll()??[]
             };
     }
 }
