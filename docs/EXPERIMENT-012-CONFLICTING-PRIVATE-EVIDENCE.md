@@ -61,6 +61,47 @@ repeated/ambiguous roots, authorized deactivations, time decay, normalized
 alternatives, and the explicit unknown option. No runtime throughput or
 human-belief realism claim is made for this stage.
 
+## Multi-day private belief journal (second increment)
+
+The optional `PrivateBeliefTimeline` records evidence-driven revisions to an
+agent's mutually exclusive hypotheses as the simulation progresses. It reads
+only the actor's filtered `AgentView.Evidence` and received messages, never
+authoritative incident truth or another agent's memory.
+
+Enable it through the normal engine configuration:
+
+```csharp
+var result = new Engine(world, domain, moduleHost,
+    new EngineOptions(TrackPrivateBeliefs: true, MaxBeliefRevisionsPerAgent: 64))
+    .Run();
+
+foreach (var revision in result.BeliefRevisions) {
+    Console.WriteLine($"{revision.Tick}: {revision.AgentId} — {revision.Incident}");
+}
+```
+
+- Changes are recorded only after new or corrected **private evidence**.
+  Duplicate rumors and unauthorized retractions do not generate revisions.
+- Each revision holds an immutable point-in-time comparison and its tick;
+  the normal simulation and NPC policy are untouched.
+- The per-agent retention limit is 1–2048 (default 64); when an old incident
+  has no retained revisions, its cached comparison signature is removed too.
+- The research export includes actor IDs and must remain **privileged**. It is
+  not safe to expose an omniscient view to ordinary NPCs.
+- The same evidence can produce different heuristic weights as it ages,
+  even without a revision event. The journal is **event-driven** rather than a
+  complete time-series sampled at every turn; call `IncidentBeliefEstimator.Compare`
+  explicitly when an arbitrary-tick estimate is needed.
+- Disabled by default to avoid memory and CPU overhead in large simulations.
+
+The integration suite includes a multi-day contradictory-witness scenario,
+repeated source-root delivery, unauthorized and authorized retractions,
+retention pruning, and a seeded runtime replay demonstrating that enabling
+the research journal **does not change decisions or world events**.
+
+The journal is a diagnostic instrument, **not a validated learning algorithm**
+or a claim that the agent has acquired human psychology.
+
 ## Next work
 
 Add controlled multi-day studies of belief revision and trust dynamics,
