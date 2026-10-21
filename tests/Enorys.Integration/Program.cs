@@ -145,6 +145,81 @@ static class Program {
             Check(absent.UnknownShare==1 && absent.Alternatives.Count==0,
                 "unknown hypothesis retains full weight without private evidence");
 
+            // Multi-day stage-12 research journal: observations must be private,
+            // replayable, bounded, and independent from normal NPC decisions.
+            var journalMind=new AgentMind();
+            var journalWorld=new SurvivalWorld(d,new SurvivalConfig(81,24,6));
+            var journalActor=journalWorld.GetPrivateAgent(0);
+            var journal=new PrivateBeliefTimeline(maxRevisionsPerAgent:3);
+            void FeedBelief(long when,params Message[] events){
+                var observed=new ObservationPacket(when,(int)(when/72)+1,.5,
+                    new Dictionary<string,int>(),new Dictionary<string,bool>(),[],events);
+                journalMind.Ingest(observed);
+                journal.Observe(journalActor with { Evidence=journalMind.GetSnapshot().Evidence },observed);
+            }
+            FeedBelief(1,new Message("evidence","W1",Incident:"CASE-LONG",
+                Root:"first",Suspect:"A",LogLikelihood:Math.Log(8),
+                Source:"eyewitness",Tick:1));
+            var firstRevision=journal.Inspect(journalActor.Id).Single();
+            FeedBelief(24,new Message("evidence","W2",Incident:"CASE-LONG",
+                Root:"first",Suspect:"A",LogLikelihood:Math.Log(8),
+                Source:"hearsay",Tick:24));
+            FeedBelief(25,new Message("retract","UNKNOWN",Root:"first",Tick:25));
+            Check(journal.Inspect(journalActor.Id).Count==1,
+                "repeated rumors and unauthorized retractions do not create belief revisions");
+            FeedBelief(72,new Message("evidence","W3",Incident:"CASE-LONG",
+                Root:"second",Suspect:"B",LogLikelihood:Math.Log(4),
+                Source:"eyewitness",Tick:72));
+            var dual=journal.Inspect(journalActor.Id).Last();
+            Check(dual.Alternatives.Count==2 &&
+                Math.Abs(dual.UnknownShare+dual.Alternatives.Sum(h=>h.Share)-1)<1e-12,
+                "longitudinal private beliefs normalize competing hypotheses");
+            FeedBelief(144,new Message("evidence","W4",Incident:"CASE-LONG",
+                Root:"third",Suspect:"B",LogLikelihood:Math.Log(16),
+                Source:"eyewitness",Tick:144));
+            var revised=journal.Inspect(journalActor.Id).Last();
+            Check(revised.Alternatives.First().Suspect=="B" &&
+                revised.Alternatives.First(h=>h.Suspect=="B").Share>
+                dual.Alternatives.First(h=>h.Suspect=="B").Share,
+                "new independent source changes leading multi-day hypothesis");
+            FeedBelief(216,new Message("retract","W1",Root:"first",Tick:216));
+            var afterCorrection=journal.Inspect(journalActor.Id);
+            Check(afterCorrection.Count==3 && afterCorrection[0].Tick==72 &&
+                afterCorrection.Last().Alternatives.All(h=>h.Suspect!="A"),
+                "authorized correction updates private belief and bounds retained journal");
+            Check(journal.Inspect("unrelated-agent").Count==0 &&
+                journal.InspectAll().Count==3,
+                "research journal restricts actor-private inspection and exports retained entries");
+
+            EngineResults RunTimelineScenario(bool enabled){
+                var observedWorld=new SurvivalWorld(d,new SurvivalConfig(78,24,6,3,.65));
+                observedWorld.ScheduleObservation(1,0,new Message("evidence","W1",
+                    Incident:"CASE-RUNTIME",Root:"runtime-a",Suspect:"A003",
+                    LogLikelihood:Math.Log(12),Source:"eyewitness",Tick:1));
+                observedWorld.ScheduleObservation(25,0,new Message("evidence","W2",
+                    Incident:"CASE-RUNTIME",Root:"runtime-b",Suspect:"A004",
+                    LogLikelihood:Math.Log(8),Source:"eyewitness",Tick:25));
+                observedWorld.ScheduleObservation(49,0,new Message("retract","W1",
+                    Root:"runtime-a",Tick:49));
+                return new Engine(observedWorld,d,host,new EngineOptions(
+                    TrackPrivateBeliefs:enabled,MaxBeliefRevisionsPerAgent:8)).Run();
+            }
+            var runtimeBaseline=RunTimelineScenario(false);
+            var runtimeTracked=RunTimelineScenario(true);
+            var runtimeRepeat=RunTimelineScenario(true);
+            Check(runtimeTracked.TraceHash==runtimeBaseline.TraceHash &&
+                runtimeTracked.World.ResourcesBalanced &&
+                runtimeTracked.World.Events==runtimeBaseline.World.Events,
+                "opt-in longitudinal logging leaves baseline NPC decisions and world unchanged");
+            Check(runtimeBaseline.BeliefRevisions.Count==0 &&
+                runtimeTracked.BeliefRevisions.Any(e=>e.Incident=="CASE-RUNTIME") &&
+                JsonSerializer.Serialize(runtimeTracked.BeliefRevisions)==
+                    JsonSerializer.Serialize(runtimeRepeat.BeliefRevisions),
+                "engine captures deterministic multi-day private evidence revisions");
+            Check(firstRevision.Alternatives.Single().Suspect=="A",
+                "belief journal first private observation captured correctly");
+
+
             var beforeInvalid=extra.GetPrivateAgent(0);
             var invalidProposal=extra.Execute(new ActionProposal(beforeInvalid.Id,"survival:boil"));
             var afterInvalid=extra.GetPrivateAgent(0);
