@@ -183,9 +183,9 @@ static class Program {
                 dual.Alternatives.First(h=>h.Suspect=="B").Share,
                 "new independent source changes leading multi-day hypothesis");
             FeedBelief(216,new Message("retract","W1",Root:"first",Tick:216));
-            var afterCorrection=journal.Inspect(journalActor.Id);
-            Check(afterCorrection.Count==3 && afterCorrection[0].Tick==72 &&
-                afterCorrection.Last().Alternatives.All(h=>h.Suspect!="A"),
+            var journalAfterCorrection=journal.Inspect(journalActor.Id);
+            Check(journalAfterCorrection.Count==3 && journalAfterCorrection[0].Tick==72 &&
+                journalAfterCorrection.Last().Alternatives.All(h=>h.Suspect!="A"),
                 "authorized correction updates private belief and bounds retained journal");
             Check(journal.Inspect("unrelated-agent").Count==0 &&
                 journal.InspectAll().Count==3,
