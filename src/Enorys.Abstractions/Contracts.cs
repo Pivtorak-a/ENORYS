@@ -21,6 +21,8 @@ public record AgentView(string Id,int Zone,int Group,bool Alive,
     IReadOnlyList<string> Nearby,IReadOnlyList<HelpRequest> Requests,
     IReadOnlySet<string> Acted,IReadOnlySet<string> Reported,
     IReadOnlyList<RetractionRequest> PendingCorrections){
+    /// <summary>Opt-in experimental social decision policy; off in existing callers.</summary>
+    public bool UseCompetingBeliefs {get;init;}
     public bool HasEvidenceIndex {get;init;}
     public IReadOnlyList<IndexedEvidenceGroup> IndexedEvidenceGroups {get;init;}=[];
 }
