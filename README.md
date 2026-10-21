@@ -2,6 +2,8 @@
 
 ### A modular cognitive engine for autonomous game characters and AI agents
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
 **ENORYS is an experimental, headless cognitive engine built in C# / .NET 10.** It explores how autonomous agents can perceive a world, form their own beliefs, remember events, develop goals, respond to social information, and make explainable decisions over time.
 
 The project serves two connected purposes:
@@ -185,4 +187,8 @@ When reporting a behavioural or performance problem, include the scenario, seed,
 
 ## License
 
-**No software license has been selected yet.** The repository is publicly readable, but public visibility alone does not grant permission to copy, modify, or redistribute its code. ENORYS should not be described as legally open-source until an appropriate license is published.
+ENORYS is licensed under the **[Apache License, Version 2.0](LICENSE)**.
+
+Copyright 2026 Andrii Pivtorak. See the [NOTICE](NOTICE) file for attribution.
+
+Apache 2.0 permits use, modification, distribution, and commercial integration, including in proprietary games and AI applications, subject to the license terms and preservation of required notices.
