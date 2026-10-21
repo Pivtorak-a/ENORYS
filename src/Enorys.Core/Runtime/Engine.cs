@@ -12,7 +12,8 @@ public sealed record EngineOptions(bool Planning=true,bool Social=true,bool Cogn
     int BackgroundRoundsPerDay=3,bool CaptureHistory=true,bool NormalizeCognitiveClock=false,
     bool HybridUseTimingWheel=true,bool CertifiedDecisions=false,bool AuditCertificates=false,
     bool AdaptiveCertificateAdmission=false,bool TrackPrivateBeliefs=false,
-    int MaxBeliefRevisionsPerAgent=64,bool CompetingBeliefPolicy=false);
+    int MaxBeliefRevisionsPerAgent=64,bool CompetingBeliefPolicy=false,
+    bool AdaptiveSourceTrust=false);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
     string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}
@@ -28,6 +29,7 @@ public sealed record EngineResults(WorldMetrics World,long Automatic,long Delibe
     public long CausalObservations {get;init;}
     public long CausalDecisions {get;init;}
     public IReadOnlyList<PrivateBeliefRevision> BeliefRevisions {get;init;}=[];
+    public long VerifiedSourceTrustUpdates {get;init;}
 }
 /// <summary>Core owns cognition, World Adapter owns truth and material state.</summary>
 public sealed class Engine {
@@ -46,6 +48,7 @@ public sealed class Engine {
     private readonly IReadOnlyList<IAffectiveModule> affects;
     private readonly IReadOnlyList<ICausalGraphModule> causalGraphs;
     private long causalObservations,causalDecisions;
+    private long verifiedSourceTrustUpdates;
     private readonly IReadOnlyList<ICognitiveWakeSignal> wakeContributors;
     private readonly int cognitiveTickStride;
     private long cognitiveWakeVetoes;
@@ -281,6 +284,12 @@ public sealed class Engine {
             }
             candidateChecks+=choice.CandidateCount;
             var result=world.Execute(choice.Proposal);
+            // A trusted, accepted post-action verdict is visible only to
+            // this acting agent; ordinary witness messages can never invoke
+            // the verification pathway.
+            if(options.AdaptiveSourceTrust&&result.Accepted&&result.VerifiedOutcome!=null)
+                verifiedSourceTrustUpdates+=mind.LearnFromVerifiedOutcome(
+                    actor.Id,result.VerifiedOutcome);
             if(causalGraphs.Count>0){
                 foreach(var graph in causalGraphs){
                     graph.RecordDecision(actor,choice,result,obs.Tick/cognitiveTickStride);
@@ -343,7 +352,8 @@ public sealed class Engine {
                 CertificateAudits=certificateAudits,
                 CertificateThrottled=certificateThrottled,
                 CausalObservations=causalObservations,CausalDecisions=causalDecisions,
-                BeliefRevisions=beliefTimeline?.InspectAll()??[]
+                BeliefRevisions=beliefTimeline?.InspectAll()??[],
+                VerifiedSourceTrustUpdates=verifiedSourceTrustUpdates
             };
     }
 }
