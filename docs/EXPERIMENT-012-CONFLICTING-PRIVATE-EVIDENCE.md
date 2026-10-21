@@ -102,6 +102,53 @@ the research journal **does not change decisions or world events**.
 The journal is a diagnostic instrument, **not a validated learning algorithm**
 or a claim that the agent has acquired human psychology.
 
+## Opt-in social action policy (third increment)
+
+A domain-specific policy in `src/Enorys.Domains.Survival/CompetingBeliefPolicy.cs`
+uses `IncidentBeliefEstimator.Compare` to propose actions under conflicting
+private testimony. The old policy remains the default and is unchanged.
+
+Enable the experimental policy on the engine:
+
+```csharp
+var run = new Engine(world, domain, host,
+    new EngineOptions(CompetingBeliefPolicy: true)).Run();
+```
+
+For a requested incident, an actor only considers its **own active evidence**
+and an explicit unknown/other option. It can **investigate** after a plausible
+claim, but an **accusation** needs (1) at least two independent provenance roots,
+(2) heuristic support of at least 0.75, and (3) a lead of at least 0.35 over
+both the unknown option and the next strongest alternative. Passing on a claim
+has a separate support and margin gate. These numbers are **unvalidated design
+thresholds**, not probabilities of real-world guilt.
+
+The actor cannot read World Authority when choosing, and sender-authorized
+retractions are reflected through the existing private `AgentMind` pipeline.
+This is specifically a *mutually exclusive incident* policy. Multiple
+co-perpetrator incidents are out of scope.
+
+For compatibility with provable fast-path assumptions, both fast LOD and the
+action-choice certificate abstain when opt-in social deliberation is enabled.
+The full decision procedure then evaluates the new policy. This costs extra
+CPU; benchmark before using it for very large numbers of NPCs.
+
+### Five-seed controlled comparison
+
+```bash
+dotnet run --project tests/Enorys.Integration -c Release -- compare-beliefs
+```
+
+The command runs two identical scheduled-observation worlds (legacy vs
+competing beliefs) for each of five seeds, prints their action hashes,
+accepted accusations/investigations and accurate-accusation counts, and
+asserts the resource ledger remains conserved. Differences are
+**descriptive only**: five synthetic seeds do not prove improved intelligence,
+realism, fairness, or performance. The direct regression tests additionally
+check: one strong witness triggers inquiry instead of accusation; two
+independent supporters permit accusation; contested alternatives suppress
+premature blame; forwarded claims and retractions do not create fake support.
+
 ## Next work
 
 Add controlled multi-day studies of belief revision and trust dynamics,
