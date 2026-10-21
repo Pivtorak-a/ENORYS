@@ -92,5 +92,12 @@ public sealed class PrivateBeliefTimeline {
             :Array.Empty<PrivateBeliefRevision>();
     }
 
+    /// <summary>Privileged research export; do not expose to ordinary agents.</summary>
+    public IReadOnlyList<PrivateBeliefRevision> InspectAll()=>Array.AsReadOnly(
+        actors.Values.SelectMany(a=>a.Revisions)
+            .OrderBy(r=>r.Tick)
+            .ThenBy(r=>r.AgentId,StringComparer.Ordinal)
+            .ThenBy(r=>r.Incident,StringComparer.Ordinal).ToArray());
+
     public long RetainedRevisions=>actors.Values.Sum(a=>a.Revisions.Count);
 }
