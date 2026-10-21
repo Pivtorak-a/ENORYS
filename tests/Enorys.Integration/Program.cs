@@ -23,6 +23,7 @@ static class Program {
             "profile"=>Profile(domain),
             "compare-native"=>CompareNative(domain),
             "test"=>Tests(root,domain,host),
+            "compare-beliefs"=>CompareBeliefPolicies(domain,host),
             _=>Help()
         };
     }
@@ -55,6 +56,54 @@ static class Program {
        double resource=.55,bool planning=true,bool lod=true,bool social=true,bool audit=false){
         var world=new SurvivalWorld(d,new SurvivalConfig(seed,agents,days,3,resource));
         return new Engine(world,d,h,new EngineOptions(planning,social,lod,audit)).Run();
+    }
+
+    // Descriptive A/B fixture: repeated seeded runs; no claim of superior
+    // overall gameplay quality based on these short scenarios.
+    static int CompareBeliefPolicies(DomainRegistry domain,ModuleHost host){
+        var rows=new List<object>();
+        foreach(int seed in new[]{41,73,87,113,145}) {
+            (EngineResults Result, int Accuracies) RunScenario(bool enabled){
+                var world=new SurvivalWorld(domain,new SurvivalConfig(seed,24,7,3,.65));
+                world.ScheduleObservation(1,0,new Message("evidence","W1",
+                    Incident:"CASE-CHOICE",Root:"claim-a",Suspect:"A002",
+                    LogLikelihood:Math.Log(25),Source:"eyewitness",Tick:1));
+                world.ScheduleObservation(25,0,new Message("evidence","W2",
+                    Incident:"CASE-CHOICE",Root:"claim-b",Suspect:"A003",
+                    LogLikelihood:Math.Log(25),Source:"eyewitness",Tick:25));
+                world.ScheduleObservation(73,0,new Message("retract","W1",
+                    Root:"claim-a",Tick:73));
+                var results=new Engine(world,domain,host,
+                    new EngineOptions(CompetingBeliefPolicy:enabled)).Run();
+                return (results,world.AccurateAccusations);
+            }
+            var reference=RunScenario(false);
+            var experimental=RunScenario(true);
+            if(!reference.Result.World.ResourcesBalanced ||
+               !experimental.Result.World.ResourcesBalanced)
+                throw new InvalidOperationException("Resource conservation failure");
+            rows.Add(new {
+                seed,
+                baseline=new {
+                    reference.Result.TraceHash,
+                    accusations=reference.Result.World.Actions.GetValueOrDefault("survival:accuse"),
+                    investigations=reference.Result.World.Actions.GetValueOrDefault("survival:investigate"),
+                    accurateAccusations=reference.Accuracies
+                },
+                competingBeliefs=new {
+                    experimental.Result.TraceHash,
+                    accusations=experimental.Result.World.Actions.GetValueOrDefault("survival:accuse"),
+                    investigations=experimental.Result.World.Actions.GetValueOrDefault("survival:investigate"),
+                    accurateAccusations=experimental.Accuracies
+                },
+                changedActions=reference.Result.TraceHash!=experimental.Result.TraceHash
+            });
+        }
+        Console.WriteLine(JsonSerializer.Serialize(new {
+            disclaimer="Descriptive five-seed fixture only; no general quality or performance claim.",
+            agents=24,days=7,rows
+        },new JsonSerializerOptions{WriteIndented=true}));
+        return 0;
     }
 
     static int Simulate(DomainRegistry d,ModuleHost host,string[] args){
