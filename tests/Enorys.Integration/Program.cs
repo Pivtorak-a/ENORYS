@@ -131,11 +131,11 @@ static class Program {
             Check(negative.Alternatives.First(h=>h.Suspect=="A").Share<
                 comparison.Alternatives.First(h=>h.Suspect=="A").Share,
                 "contradictory negative evidence reduces suspect support");
-            var corrected=IncidentBeliefEstimator.Compare(
+            var revisedBeliefs=IncidentBeliefEstimator.Compare(
                 claims.Select(e=>e.Root=="root-a1"?e with {Active=false}:e).ToArray(),
                 "CASE-12",5);
-            Check(corrected.Alternatives.All(h=>h.Suspect!="A") &&
-                corrected.Alternatives.Single().Suspect=="B",
+            Check(revisedBeliefs.Alternatives.All(h=>h.Suspect!="A") &&
+                revisedBeliefs.Alternatives.Single().Suspect=="B",
                 "retraction removes unsupported alternative and preserves other sources");
             var aged=IncidentBeliefEstimator.Compare(claims,"CASE-12",20000);
             Check(aged.Alternatives.First(h=>h.Suspect=="A").Share<
