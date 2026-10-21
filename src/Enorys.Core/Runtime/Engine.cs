@@ -12,7 +12,7 @@ public sealed record EngineOptions(bool Planning=true,bool Social=true,bool Cogn
     int BackgroundRoundsPerDay=3,bool CaptureHistory=true,bool NormalizeCognitiveClock=false,
     bool HybridUseTimingWheel=true,bool CertifiedDecisions=false,bool AuditCertificates=false,
     bool AdaptiveCertificateAdmission=false,bool TrackPrivateBeliefs=false,
-    int MaxBeliefRevisionsPerAgent=64);
+    int MaxBeliefRevisionsPerAgent=64,bool CompetingBeliefPolicy=false);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
     string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}
@@ -146,6 +146,7 @@ public sealed class Engine {
             Requests=state.Requests,Nearby=packet.Nearby,Acted=state.Acted,
             Reported=state.Reported,PendingCorrections=state.Corrections,
             PlanGoal=mind.Plan?.Goal,
+            UseCompetingBeliefs=options.CompetingBeliefPolicy,
             HasEvidenceIndex=true,
             IndexedEvidenceGroups=state.IndexedEvidenceGroups
         };

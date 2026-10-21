@@ -84,19 +84,42 @@ public sealed partial class SurvivalBehavior : IEnorysModule, IDecisionModule, I
                 !a.Reported.Contains("retract:"+x.Root+":"+x.Recipient));
             if(correction!=null)candidates.Add(C(a,"retract",3.2,"correct false report",
                 target:correction.Recipient,root:correction.Root));
-            var suspicion=FindSuspicion(a,p.Tick,ctx.CognitiveTickStride);
-            if(suspicion!=null&&suspicion.Value.Probability>.4){
-                var s=suspicion.Value;
-                if(!a.Acted.Contains("investigate:"+s.Incident))
-                    candidates.Add(C(a,"investigate",1.15+1.2*s.Probability+.5*t.Curiosity,
-                        "uncertain claim",incident:s.Incident));
-                if(s.Probability>.56&&!a.Acted.Contains("accuse:"+s.Incident+":"+s.Suspect))
-                    candidates.Add(C(a,"accuse",.85+1.6*s.Probability+.35*t.Norm,
-                        "social norm",target:s.Suspect,incident:s.Incident));
-                string? recipient=p.Nearby.FirstOrDefault(x=>x!=s.Suspect&&!a.Reported.Contains(s.Root+":"+x));
-                if(recipient!=null&&p.Tick>1)
-                    candidates.Add(C(a,"tell",.8+.9*t.Sociability+.5*s.Probability,
-                        "tell witness",target:recipient,incident:s.Incident,root:s.Root,suspect:s.Suspect,lr:s.LogLikelihood));
+            if(a.UseCompetingBeliefs){
+                // Experimental policy: compare actor-private alternative accounts.
+                // A single compelling rumor can warrant inquiry, not accusation.
+                var proposal=CompetingBeliefPolicy.Evaluate(a,p.Tick);
+                if(proposal!=null){
+                    var s=proposal;
+                    if(!a.Acted.Contains("investigate:"+s.Incident))
+                        candidates.Add(C(a,"investigate",1.15+1.2*s.Share+.5*t.Curiosity,
+                            "competing private claims",incident:s.Incident));
+                    if(s.MayAccuse&&!a.Acted.Contains("accuse:"+s.Incident+":"+s.Suspect))
+                        candidates.Add(C(a,"accuse",.85+1.6*s.Share+.35*t.Norm,
+                            "corroborated private claim",target:s.Suspect,incident:s.Incident));
+                    if(s.MayTell){
+                        string? recipient=p.Nearby.FirstOrDefault(x=>x!=s.Suspect&&
+                            !a.Reported.Contains(s.Root+":"+x));
+                        if(recipient!=null&&p.Tick>1)
+                            candidates.Add(C(a,"tell",.8+.9*t.Sociability+.5*s.Share,
+                                "share supported private claim",target:recipient,
+                                incident:s.Incident,root:s.Root,suspect:s.Suspect,lr:s.LogLikelihood));
+                    }
+                }
+            }else{
+                var suspicion=FindSuspicion(a,p.Tick,ctx.CognitiveTickStride);
+                if(suspicion!=null&&suspicion.Value.Probability>.4){
+                    var s=suspicion.Value;
+                    if(!a.Acted.Contains("investigate:"+s.Incident))
+                        candidates.Add(C(a,"investigate",1.15+1.2*s.Probability+.5*t.Curiosity,
+                            "uncertain claim",incident:s.Incident));
+                    if(s.Probability>.56&&!a.Acted.Contains("accuse:"+s.Incident+":"+s.Suspect))
+                        candidates.Add(C(a,"accuse",.85+1.6*s.Probability+.35*t.Norm,
+                            "social norm",target:s.Suspect,incident:s.Incident));
+                    string? recipient=p.Nearby.FirstOrDefault(x=>x!=s.Suspect&&!a.Reported.Contains(s.Root+":"+x));
+                    if(recipient!=null&&p.Tick>1)
+                        candidates.Add(C(a,"tell",.8+.9*t.Sociability+.5*s.Probability,
+                            "tell witness",target:recipient,incident:s.Incident,root:s.Root,suspect:s.Suspect,lr:s.LogLikelihood));
+                }
             }
         }
         if(choiceKernel!=null){
@@ -156,6 +179,7 @@ public sealed partial class SurvivalBehavior : IEnorysModule, IDecisionModule, I
     }
 
     public Decision? TryFastDecision(AgentView a,ObservationPacket p,IDecisionContext ctx){
+        if(ctx.SocialEnabled&&a.UseCompetingBeliefs)return null;
         if(ctx.HasAffect || ctx.HasCausalGraph || a.Health<45||a.Infection>45||a.Injury>50||a.PlanGoal==null)return null;
         if(ctx.SocialEnabled && (a.Evidence.Any(x=>x.Active)||a.Requests.Count>0||
              a.Debts.Any(x=>x.Value>0)||a.PendingCorrections.Count>0||
