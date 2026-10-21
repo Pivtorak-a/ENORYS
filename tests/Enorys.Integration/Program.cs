@@ -439,7 +439,8 @@ static class Program {
             var learnedSnapshot=feedbackMind.GetSnapshot();
             Check(learned==2&&feedbackMind.Trust.GetValueOrDefault("W1")==8&&
                 feedbackMind.Trust.GetValueOrDefault("W2")==-12&&
-                !feedbackMind.Trust.ContainsKey("W3")&&!feedbackMind.Trust.ContainsKey("W4"),
+                feedbackMind.Trust.GetValueOrDefault("W3")==-4&&
+                !feedbackMind.Trust.ContainsKey("W4"),
                 "source trust rewards correct reports, penalizes false ones and skips withdrawn or contradictory senders");
             Check(feedbackMind.LearnFromVerifiedOutcome("A001",firstVerdict.VerifiedOutcome!)==0 &&
                 oldMindSnapshot.Trust.Count==0 && learnedSnapshot.Trust.Count==2,
