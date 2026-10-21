@@ -1,190 +1,188 @@
-# ENORYS · Modular Cognitive Engine
+# ENORYS
 
-**Headless, modular, data-driven cognitive agent research engine, targeting C# / .NET 10.** Experimental C#/.NET 10 core with optional modular cognition, social evidence, planning, emotion, causal provenance and user-defined rule packs; research through experiment 011.
+### A modular cognitive engine for autonomous game characters and AI agents
 
-> **Status:** experimental C#/.NET 10 research engine, not a production SDK, complete human cognition model, Godot game or validated psychological simulator. The existing JavaScript tools are independent reference demos.
+**ENORYS is an experimental, headless cognitive engine built in C# / .NET 10.** It explores how autonomous agents can perceive a world, form their own beliefs, remember events, develop goals, respond to social information, and make explainable decisions over time.
 
-### Run the C# engine
+The project serves two connected purposes:
 
-Requires the **.NET 10 SDK**. From the repository root:
+- **For games and simulations:** enable non-player characters (NPCs) with individual memories, motivations, social relationships, and context-dependent behaviour instead of relying exclusively on scripted reactions.
+- **For AI research and agent systems:** provide a modular, inspectable environment for experimenting with memory, evidence, affect, planning, causal reasoning, and decision policies independently of any particular language model.
+
+**Current status:** active research prototype. The .NET engine, runnable examples, automated tests, and reproducible experiments exist today. ENORYS is **not yet a production-ready SDK**, a complete model of human cognition, or a finished Godot integration.
+
+## Why ENORYS exists
+
+Creating an autonomous character is not the same as giving it a list of actions.
+
+A character may need to remember who helped it, distrust a repeated rumour, adapt a plan when resources disappear, or behave differently because it witnessed an event another character did not. These behaviours depend on **internal state and experience**, not simply on the current scene.
+
+Traditional finite-state machines and behaviour trees remain useful, efficient tools. But as interactions, memories, goals, and social dependencies accumulate, manually scripting every possible combination becomes difficult. Large language models can add flexible language and high-level reasoning, but making a separate model call for every character decision may introduce cost, latency, and difficulties with reproducibility or authoritative world-state control.
+
+ENORYS investigates a complementary approach: **a reusable cognitive layer that can run without an LLM**, while leaving room for future optional language-model integration. The aim is not to replace existing game AI or LLMs. It is to make persistent agent state, decision logic, and their consequences more structured, testable, and understandable.
+
+The central principle is simple:
+
+> **An agent should act on what it has observed and come to believe—not on information it could not possibly know.**
+
+This creates a foundation for agents whose actions reflect their individual histories, and for developers who can inspect *why* those actions happened.
+
+## One architecture, two application areas
+
+| Game characters and simulated worlds | Autonomous AI agents and research |
+| --- | --- |
+| NPCs with distinct memories and motivations | Experiments with agent-local memory and evidence |
+| Social trust, rumours, obligations, and emotional responses | Inspectable, causally linked decisions |
+| Goals and reactions that evolve with events | Modular decision policies and bounded planning |
+| Headless simulation of many actors | Reproducible tests of cognitive mechanisms |
+| Future adapters for game engines such as Godot | Future integration with external tools and optional LLMs |
+
+ENORYS is **not a language model**. It does not currently generate dialogue or train a neural network. Instead, it studies the mechanisms around an agent's decision process: what the agent knows, what it values, what it intends to do, and which action the environment permits it to perform.
+
+## How the engine works
+
+```text
+             External world / simulation host
+             (the authoritative source of truth)
+                            |
+                    Filtered observation
+                            |
+                   +------------------+
+                   |  ENORYS agent    |
+                   |                  |
+                   |  Private memory  |
+                   |  Beliefs/evidence|
+                   |  Social context  |
+                   |  Affect (optional)|
+                   |  Goals/planning  |
+                   |  Causal graph    |
+                   |    (optional)    |
+                   |  Decision policy |
+                   +------------------+
+                            |
+                      Action proposal
+                            |
+             World validates / executes
+                            |
+                 Result and new events
+```
+
+Three boundaries are fundamental:
+
+1. **Private knowledge:** agents receive filtered observations; they do not directly read hidden global facts or other agents' private memories.
+2. **World authority:** cognition proposes actions, while the world adapter validates and applies their effects.
+3. **Explainability:** the system can preserve decision traces and, in the optional causal module, connect observations, beliefs, motivations, and actions.
+
+For example, an agent can hear a claim about missing water without treating it as objective truth. Retellings from the same original source need not count as independent evidence. A valid later retraction can change the agent's current motivation, while an already executed action remains in its history. These are testable mechanisms, **not a claim that the engine reproduces human psychology**.
+
+## What is implemented
+
+The repository currently includes the following experimental components:
+
+| Component | Current capability |
+| --- | --- |
+| **Headless .NET core** | Agent runtime and domain-independent abstractions, with a survival-world test domain |
+| **Memory and evidence** | Agent-local observations, source provenance, social reports, and belief updates |
+| **Goals and decisions** | Bounded planning and utility-based action selection |
+| **Affective Cognitive Map (ACM)** | Optional, configurable emotion-related state and influence on decisions |
+| **Causal cognition graph** | Optional observation → belief → affect/goal → decision links, inspection, and supported retractions |
+| **Configuration and extension examples** | JSON rule/data packs and a sample external C# behaviour module |
+| **Performance research** | Reproducible tests, CI benchmarks, scheduling experiments, and decision-certificate experiments |
+| **Browser demonstrations** | Separate JavaScript reference sandboxes illustrating selected cognitive concepts |
+
+The **C# engine is the main research implementation**. The browser demonstrations are independent reference examples and do not expose the full .NET engine.
+
+The extension interfaces and examples are experimental. They should **not** be treated as a stable, versioned third-party SDK or a sandbox for untrusted plugins.
+
+## Evidence, benchmarks, and engineering trade-offs
+
+ENORYS is developed through reproducible experiments rather than performance or intelligence claims without measurements.
+
+- A historical .NET benchmark processed **21,000 decisions for 500 NPCs in approximately 303 ms median** on a GitHub-hosted Linux runner. This is a headless workload, **not** an in-game frame-rate measurement. [Methodology](docs/NET-MIGRATION-BENCHMARK.md).
+- The standalone **PulseGraph** scheduling experiment improved one sparse 5,000-agent threshold workload by **6.57×**, but it was slower in a dense-observation scenario. It is **not** a proven whole-engine speedup. [Experiment 008](docs/EXPERIMENT-008-PULSEGRAPH-BENCHMARK.md).
+- Integration experiments with **5,500 NPCs** exposed cases where aggressive background scheduling changed outcomes or failed to improve total runtime. Those results inform the design instead of being hidden. [Experiment 009](docs/EXPERIMENT-009-HYBRID-SURVIVAL.md).
+- The optional causal graph adds useful explanation and motivation mechanisms, but also adds CPU and memory overhead in tested social workloads. [Experiment 011](docs/EXPERIMENT-011-CAUSAL-GRAPH.md).
+
+These measurements depend on the documented scenarios, hardware, and configurations. They do not establish general human-like intelligence, real-time game performance, or advantages over other agent frameworks.
+
+## Try ENORYS
+
+### Requirements
+
+- **.NET 10 SDK** for the main C# engine.
+- **Node.js 20+** for the separate JavaScript demonstrations and their tests.
+
+From the repository root, run the C# integration tests:
 
 ```bash
 dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release -- test
-dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release -- bench
-# Print a reproducible NPC event story as JSON:
+```
+
+Run a seeded, reproducible NPC simulation that prints a JSON event story:
+
+```bash
 dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release -- simulate 42 24 14
 ```
 
-**Source:** [Enorys.Abstractions](src/Enorys.Abstractions) · [Enorys.Core](src/Enorys.Core) · [Enorys.Domains.Survival](src/Enorys.Domains.Survival) · [External C# plugin](examples/Enorys.CustomBehavior) · [JSON Data Packs](data-packs/).
-
-**Historical v0.5 measurement:** 500 NPCs × 14 days × 3 turns/day = 21,000 decisions in ~303 ms median on a GitHub x64 Linux .NET 10 runner; process peak ~98 MB, short-lived allocation ~12.45 KB/turn. Read the [benchmark report](docs/NET-MIGRATION-BENCHMARK.md) for workload, CI data, GC counts and limitations. These values are **not** Godot FPS.
-
-## v0.6 — Wake Scheduler and modular emotional cognition (experimental)
-
-The C# engine now supports:
-- **Cached immutable world and actor-private views** to reduce temporary allocation pressure;
-- **Hybrid event-aware wake scheduling** with domain-defined sleep policies and message-triggered early wakeups (opt-in; may change simulated decisions);
-- Optional **Affective Cognitive Map** (`src/Enorys.Affect.ACM/`): source-linked subjective anger, fear, sadness, gratitude and guilt, lazy decay, retractions and bounded influence on decisions;
-- **Custom emotions and triggers entirely from JSON** (`data-packs/affect-custom.json`), without changing Core;
-- End-to-end tests for mixed emotions, evidence anti-echo, private data isolation, accurate material ledger and scheduler replay.
-
-Run the additional benchmark suites:
+Run the baseline benchmark or the causal cognition lab:
 
 ```bash
-dotnet run --project tests/Enorys.Integration -c Release -- test
-dotnet run --project tests/Enorys.Integration -c Release -- bench-scheduler
-dotnet run --project tests/Enorys.Integration -c Release -- bench-acm
+dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release -- bench
+dotnet run --project benchmarks/Enorys.CausalLab -c Release -- test
 ```
 
-**Observed 500-NPC batch allocation:** about **10.36 KB / nominal actor turn** with ACM off and scheduler off, down from ~12.45 KB in v0.5. This is still above the provisional <3 KB/turn optimization goal. Full methodology, timing variability, and ACM costs: [Experiment 005 — .NET Scheduler and ACM](docs/EXPERIMENT-005-NET-SCHEDULER-ACM.md).
-
-**Scope:** first optional functional emotional module and hybrid wake scheduling, **not** a full validated emotional cognition architecture, a no-scan discrete-event scheduler or a Godot frame-rate test.
-
-## Native C calculation experiment (optional)
-
-An independent native C library now benchmarks exact Noisy-OR causal inference against the existing C# math and a no-allocation C# implementation. **It is an experiment, not a mandatory ENORYS runtime dependency.**
-
-On Linux x64 (GCC `-O3`, .NET 10), 40,000 two-cause evaluations ran in **15.45 ms** with original C#, **6.66 ms** in optimized C#, and **4.87 ms** via native C/P-Invoke. Larger eight-cause evaluations showed smaller native gains. [Read the complete benchmark, numeric verification and caveats](docs/EXPERIMENT-006-C-VS-CSHARP.md).
-
-The C source is in [native/](native/), and the runnable comparison is in [benchmarks/Enorys.NativeMath/](benchmarks/Enorys.NativeMath/). Windows and macOS binary compatibility and speed are unverified.
-
-## C versus Zig versus Go: live NPC benchmarks
-
-[Experiment 007 — measured world-profile and language comparison](docs/EXPERIMENT-007-C-ZIG-GO-PROFILE.md) adds optional C/Zig/Go implementations of a single hot-path numeric choice operation, and compares them with C# over reproducible 24, 100 and 500-NPC worlds. All backends reproduce identical agent decision traces in the tested scenarios.
-
-**Result:** 500-NPC world: C# direct for loop ~185.4 ms, C# managed span **~181.9 ms**, C **~183.4 ms**, Zig **~182.1 ms**, Go **~189.6 ms** (median of 5 runs, shared Ubuntu runner). Only **~0.48%** of world time is the numeric argmax itself in a profiled run. Per-call native FFI is much slower for tiny vectors. This is **not** evidence for rewriting the whole engine in a native language. The default C# path now removes one per-decision LINQ iterator without any required native dependencies.
-
-Native builds and verification via [C/Zig/Go CI workflow](.github/workflows/c-zig-go-world.yml). The existing C# engine still requires none of these optional libraries.
-
-## Experimental PulseGraph architecture — sparse, causal event scheduling
-
-[PulseGraph ADR-0004](docs/ADR-0004-PULSEGRAPH.md) explores a more unusual **event-driven cognition schedule**: don't scan every NPC's needs every tick. Instead, compute each signal's next relevant threshold crossing and wake an agent only when a deadline or a private observation arrives.
-
-The **standalone C# experiment** in [experiments/Enorys.PulseGraph](experiments/Enorys.PulseGraph) compared an exact sparse scheduler against a reference tick scan. In **54 matched seeded test cases**, action counts and ordered action-trace checksums agreed. On a GitHub CI runner, 5,000 NPC and nine signals took **192.60 ms by full scanning vs 29.31 ms by PulseGraph (6.57×)**. But a dense-observation case was **slower with PulseGraph** (53.07 vs 28.24 ms for 500 NPC), and the event queue allocated more memory.
-
-This is **NOT a drop-in replacement for ENORYS Core**: the proof tests deterministic threshold regulation, *not* the complete world, social cognition, ACM, or Godot. A future production architecture should combine sparse distant agents with dense ECS updates for active/high-interaction regions.
-
-Read the [complete benchmark protocol, negative results, modularity and integration gates](docs/EXPERIMENT-008-PULSEGRAPH-BENCHMARK.md). Run with `dotnet run --project experiments/Enorys.PulseGraph -c Release -- test` and `-- bench`.
-
-## Hybrid cognition in the actual SurvivalWorld (experiment 009)
-
-Beyond the standalone PulseGraph test, the **real C# ENORYS SurvivalWorld and Engine** now support an **opt-in** 500 active + 5,000 background-NPC mode. It uses `PulseWheelCalendar` or `PulseCalendar` (heap), real world-side inventory and day progression, private observation/inbox wakeups, plan/memory/epistemics updates, optional ACM, and registered module-defined wake signals.
-
-**Important results:** seven-day world, 115,500 nominal actor slots, .NET 10 Linux CI:
-
-- Low-social: full decisions **738 ms**, aggressive wheel **738 ms** (similar), conservative wheel **877 ms**. Aggressive background skipping saved ~28% managed allocations but reduced mean health from **91.48 → 83.72**; conservative preserved health (~91.07) but was slower.
-- Higher-social: full decisions **1,088 ms**, aggressive wheel **1,160 ms**, conservative wheel **1,227 ms**. Again, the approximate event-driven policy did **not** improve whole-world speed.
-- Material conservation and determinism tested; disabled skipping exactly reproduces the original reference trace on matched small-world tests. Significant private emotional states can prevent further sleep.
-
-Therefore **the default engine remains unchanged**. The optional scheduling layer is a research tool for measuring actor activity and building an eventual action-preserving event graph, not a proven 5,500-agent speedup. It still has quality/performance tradeoffs to solve.
-
-Read [Experiment 009 — complete benchmark, health and allocation comparisons](docs/EXPERIMENT-009-HYBRID-SURVIVAL.md) and [ADR-0005](docs/ADR-0005-HYBRID-SURVIVAL.md). Try it:
-
-```bash
-dotnet run --project benchmarks/Enorys.HybridSurvival -c Release -- test
-dotnet run --project benchmarks/Enorys.HybridSurvival -c Release -- bench
-```
-
-## Exact certified choices and indexed social cognition (experiment 010)
-
-ENORYS now has an **optional, independently auditable action-choice certificate** for the real C# survival decision module: when all relevant planner/social/affect dependencies are known inactive, a no-list-allocating evaluator proves the current best action by a **strict utility margin**. If anything is unknown, it fails closed to full deliberation. Every actor **still chooses and executes an action each turn**, so this avoids the quality loss of approximating entire actor turns away.
-
-New optional flags: `CertifiedDecisions`, `AuditCertificates`, `AdaptiveCertificateAdmission` in `EngineOptions`. Private evidence is also grouped/sorted once per memory update instead of every decision; third-party manually constructed `AgentView` snapshots retain the compatible unindexed evaluator.
-
-**Verification:** 97 audited real-world scenario instances (including a 5,500-NPC full action-history replay) preserve action order, world event counts, health and resource ledger. In seven-day 5,500-NPC headless tests, static certificates reduced transient allocations from **789 → 647 MiB** in sparse social activity and **877 → 771 MiB** in denser social activity. Recorded wall-time improvements were modest and varied between shared CI runs; adaptive proof admission is **not** a universal speed win.
-
-Read [the full mathematical design and opt-in safety conditions](docs/ADR-0006-CERTIFIED-DECISIONS.md) and [reproducible Experiment 010 timing and gameplay comparisons](docs/EXPERIMENT-010-CERTIFIED-DECISIONS.md).
-
-```bash
-dotnet run --project benchmarks/Enorys.HybridSurvival -c Release -- cert-test
-dotnet run --project benchmarks/Enorys.HybridSurvival -c Release -- cert-bench
-```
-
-This is a **one-turn proof of the chosen action**, not a guarantee that future turns are invariant or may be omitted. Default scheduler and certification switches remain off.
-
-## Experiment 011: modular causal cognition graph
-
-The optional [C# causal graph module](src/Enorys.Cognition.Graph) links private observations, beliefs, ACM emotions, motivational goals and relevant actions. It supports source-root provenance, private retractions, bounded history, lazy decay, custom JSON rules and a Decision Inspector.
-
-Use [the base rules](data-packs/causal-survival.json), [custom rules](data-packs/causal-custom.json), or implement an additional public `ICausalGraphModule` plugin. The default engine is unchanged when this module is absent.
-
-Read [Experiment 011](docs/EXPERIMENT-011-CAUSAL-GRAPH.md) and [ADR-0007](docs/ADR-0007-INCREMENTAL-CAUSAL-COGNITION.md). The graph increases processing/memory cost; it is a cognition feature, not a speed optimization. It does not yet include durable snapshots or Godot.
-
-Run: `dotnet run --project benchmarks/Enorys.CausalLab -c Release -- test`
-
-## Legacy research demos (JavaScript)
-
-
-**Experimental cognitive architecture for autonomous agents.** A small but runnable browser sandbox illustrating how partial observations, remembered events, social reports and explainable utility-based decisions can produce different histories from the same initial agents.
-
-> **Legacy demo status:** the browser sandbox remains separate from the C# kernel; its scenario-specific algorithms are not the general-purpose plugin API.
-
-## Try the demo
-
-Open [`index.html`](./index.html) through a local HTTP server, or enable GitHub Pages in **Settings → Pages → Deploy from a branch → main → /(root)** to make it available in the browser. No external services, build tools, API keys or network requests are required at runtime.
-
-```bash
-# In a checkout of this repository:
-python3 -m http.server 8000
-# Open http://localhost:8000
-```
-
-Alternatively use Node.js 20+ to run the automated tests:
+For the independent browser demonstration:
 
 ```bash
 npm ci
 npm test
+python3 -m http.server 8000
 ```
 
-### What you can do
+Then open `http://localhost:8000/` in a browser. The browser sandbox is a conceptual demonstration, not a frontend connected to the current .NET kernel.
 
-- Create **6–60 agents** with seeded individual traits, resources and zones.
-- Advance **one or 100 decisions** at a time; watch taking, giving, waiting and passing reports.
-- Inspect every candidate action's **utility components**.
-- Select an agent and inspect **eyewitness vs hearsay provenance** and changing relationships.
-- Run a **counterfactual comparison** with the same seed and agents but 0% vs 100% witness chance.
-- File issues with your seed, agent count, witness chance and steps so others can reproduce behavior.
+## Repository guide
 
-## Experiment 004 — Agent Evolution Lab (v0.4)
+| Path | Purpose |
+| --- | --- |
+| [`src/Enorys.Abstractions`](src/Enorys.Abstractions) | Core contracts and extension interfaces |
+| [`src/Enorys.Core`](src/Enorys.Core) | Runtime, memory/evidence, planning, decision, and social systems |
+| [`src/Enorys.Domains.Survival`](src/Enorys.Domains.Survival) | Example world domain and action validation |
+| [`src/Enorys.Affect.ACM`](src/Enorys.Affect.ACM) | Optional affective cognition |
+| [`src/Enorys.Cognition.Graph`](src/Enorys.Cognition.Graph) | Optional causal cognition and explanation |
+| [`examples/Enorys.CustomBehavior`](examples/Enorys.CustomBehavior) | External C# behaviour-module example |
+| [`data-packs`](data-packs) | Example configuration and cognitive rule packs |
+| [`tests`](tests), [`benchmarks`](benchmarks), [`experiments`](experiments) | Automated tests and repeatable research |
+| [`docs`](docs) | Architectural decisions, methodology, results, and limitations |
 
-Four sequentially tested reference architecture steps: **survival domain boundaries**, **multi-step goals and dynamic reservations**, **private evidence / social obligations**, and **conservative Cognitive LOD**. This is runnable **JavaScript reference code**, not the finalized .NET kernel.
+## Development direction
 
-- [Interactive Agent Evolution Lab](evolution.html) — compare same-seed scenarios, inspect NPC memories and event histories.
-- [Methodology, expectations vs outcomes](docs/EXPERIMENT-004.md) — 40 paired seeds, 100 fuzz seeds, 100 LOD audit seeds, 50/100/500-NPC indicative benchmarks.
-- [Architecture and next release gates](docs/ARCHITECTURE-V04.md).
+The longer-term goal is a **reusable cognitive layer** that different simulation hosts and agent systems can adopt without hard-coding their game mechanics or infrastructure into ENORYS Core.
 
-```bash
-node --test tests/v04-*.test.js
-node scripts/experiment-004.mjs
-python3 -m http.server 8000   # open http://localhost:8000/evolution.html
-```
+Priorities include:
 
-**Limitations:** old v0.3 files remain reproducible and unchanged. In v0.4, 500-agent LOD speedups are **not** yet substantiated; the .NET/Godot integration remains outstanding.
+1. **Persistence and longer-term cognition:** save/restore for agent state and causal history; richer belief revision and evolving relationships.
+2. **Practical host integration:** a Godot adapter and a small interactive example that connects perception, decisions, and actions to a live game world.
+3. **Extension maturity:** clearer, versioned module and data-pack contracts, compatibility tests, and developer documentation.
+4. **Measurable scalability:** improve memory and scheduling while preserving agent behaviour where exact equivalence is required.
+5. **Optional AI-model integration:** investigate using LLMs for dialogue or high-level guidance while keeping world validation and time-critical cognition under explicit control.
 
-## Modular extensibility — proposed production contract
+These are **development goals**, not shipped features. ENORYS does not currently provide a production Godot package, generic LLM interface, full durable cognitive snapshots, or a validated simulation of human minds.
 
-ENORYS is designed to remain **game-agnostic**. Users should be able to add their own needs, items, emotions, norms and actions as validated namespaced **Data Packs**, add decision/appraisal/psychology algorithms as versioned **Behavior Modules**, and connect Godot or other simulations through independent **World Adapters**, without editing or rebuilding the Core. The Affective Cognitive Map is replaceable, not mandatory.
+## Why this work matters
 
-Read [ADR-0003 — extensible modules and user-authored data](docs/ADR-0003-EXTENSIBLE-MODULES.md) and [ADR-0002 — Affective Cognitive Map](docs/ADR-0002-AFFECTIVE-COGNITIVE-MAP.md). **Status: proposed architecture**. The plugin loader, data schemas and public module SDK are **not implemented yet**. Their acceptance tests are specified in ADR-0003.
+Both interactive worlds and autonomous software agents face a similar engineering problem: **how to maintain a coherent decision-maker across time when information is incomplete, priorities compete, and actions have consequences**.
 
-## What the prototype does NOT do
+ENORYS approaches that problem with modular components, clear information boundaries, auditable causal traces, and reproducible experiments. Even when a future system uses an LLM, it still needs ways to manage observations, memory, permissions, world state, and action execution. ENORYS is an attempt to investigate and eventually provide reusable infrastructure for those responsibilities.
 
-This **legacy browser demo** has no natural language generation, LLM integration, persistence, or Godot adapter; it is not a high-fidelity cognitive simulator. The newer C# engine **does** include an experimental planner and memories, but not the proposed full Affective Cognitive Map. Rules and trait weights are **toy experimental defaults**, not psychologically calibrated. An audit log is available to the UI but never passed into an agent's decision function.
+The value of the project is therefore not a claim to have created artificial consciousness or general intelligence. It is a practical research effort toward **more persistent, inspectable, and extensible autonomous behaviour**.
 
-## Architecture
+## Contributing and feedback
 
-- `src/engine.js`: seeded RNG, isolated agent observations, memory, relationships, decisions, authoritative world adapter, deterministic event log.
-- `web/app.js`, `web/style.css`, `index.html`: dependency-free interactive UI.
-- `tests/engine.test.js`: determinism, provenance, utility transparency, conservation of resources, validation.
-- `docs/ARCHITECTURE.md`: boundaries, assumptions and known limitations.
+The project is in active experimental development. Bug reports, reproducible scenarios, design critiques, and benchmark comparisons are welcome through [GitHub Issues](https://github.com/Pivtorak-a/ENORYS/issues). For significant changes, please open an issue to discuss scope before submitting a pull request.
 
-## Development and contribution
-
-- `main`: tested public version.
-- `develop`: integration branch.
-- [Open a bug report or feature request](https://github.com/Pivtorak-a/ENORYS/issues). Please include reproduction inputs.
-- If you'd like to contribute code, open an issue first to discuss scope.
+When reporting a behavioural or performance problem, include the scenario, seed, command, .NET version, expected result, and observed result where possible.
 
 ## License
 
-**No license chosen yet.** Code is public for inspection; public visibility by itself does not confer broad rights to copy, modify or distribute it. Maintainer will choose a code license before calling the project open source.
+**No software license has been selected yet.** The repository is publicly readable, but public visibility alone does not grant permission to copy, modify, or redistribute its code. ENORYS should not be described as legally open-source until an appropriate license is published.
