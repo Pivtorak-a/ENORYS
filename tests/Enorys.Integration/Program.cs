@@ -443,7 +443,9 @@ static class Program {
                 !feedbackMind.Trust.ContainsKey("W4"),
                 "source trust rewards correct reports, penalizes false ones and skips withdrawn or contradictory senders");
             Check(feedbackMind.LearnFromVerifiedOutcome("A001",firstVerdict.VerifiedOutcome!)==0 &&
-                oldMindSnapshot.Trust.Count==0 && learnedSnapshot.Trust.Count==2,
+                oldMindSnapshot.Trust.Count==1 &&
+                oldMindSnapshot.Trust.GetValueOrDefault("W3")==-4 &&
+                learnedSnapshot.Trust.Count==3,
                 "same verified incident cannot repeatedly increase trust and old snapshot is immutable");
             feedbackMind.Ingest(feedbackPacket with {Tick=3,Messages=[
                 new Message("evidence","W1",Incident:"CASE-FUTURE",Root:"later-true",
