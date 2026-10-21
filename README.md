@@ -106,6 +106,7 @@ ENORYS is developed through reproducible experiments rather than performance or 
 - The optional causal graph adds useful explanation and motivation mechanisms, but also adds CPU and memory overhead in tested social workloads. [Experiment 011](docs/EXPERIMENT-011-CAUSAL-GRAPH.md).
 - **Experimental private belief comparison** can normalize competing accounts of one incident using unique evidence roots, deactivations and decay. This is an opt-in heuristic API, not an existing NPC policy or a calibrated probability model. [Experiment 012](docs/EXPERIMENT-012-CONFLICTING-PRIVATE-EVIDENCE.md).
 - **Opt-in private belief timeline:** record bounded, evidence-driven revisions across simulated days for debugging and research; regression tests ensure normal NPC choices and outcomes are unchanged. [Experiment 012](docs/EXPERIMENT-012-CONFLICTING-PRIVATE-EVIDENCE.md).
+- **Experimental belief-aware social policy:** optionally use alternative private hypotheses to prefer investigation over unsupported accusation, with two-independent-source gating and an A/B replay CLI. Default NPC choices are unchanged. [Experiment 012](docs/EXPERIMENT-012-CONFLICTING-PRIVATE-EVIDENCE.md).
 
 These measurements depend on the documented scenarios, hardware, and configurations. They do not establish general human-like intelligence, real-time game performance, or advantages over other agent frameworks.
 
