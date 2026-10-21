@@ -149,6 +149,74 @@ check: one strong witness triggers inquiry instead of accusation; two
 independent supporters permit accusation; contested alternatives suppress
 premature blame; forwarded claims and retractions do not create fake support.
 
+## Verified-outcome source trust (fourth increment)
+
+Stage 12 includes an **experimental, opt-in source credibility update** for
+the acting NPC, grounded in an authoritative, post-action verdict. The
+existing survival-world `investigate` clue is deliberately *not*
+considered verification because it has a known misidentification rate.
+Ordinary witness messages cannot carry an authoritative verdict.
+
+**Trust boundary:** only a trusted `IWorldAdapter.Execute` result may
+attach a `VerifiedIncidentOutcome`. For the provided `SurvivalWorld`, this
+feedback is emitted only after an accepted `survival:accuse` concerning a
+real recorded world incident and only when `VerifiedAccusationFeedback`
+is enabled. Unknown incident IDs, rejected actions and ordinary observations
+never contain a verdict. The World Adapter knows the incident's objective
+actor, but **only the accuser's private `AgentMind` gets the feedback**;
+other NPCs do not receive world truth. This is a synthetic research oracle
+in the survival benchmark, **not** a model of realistic investigation or
+a decision that a real person is guilty.
+
+Enable BOTH opt-in gates:
+
+```csharp
+var world = new SurvivalWorld(domain,
+    new SurvivalConfig(Seed: 42, Agents: 24, Days: 14,
+        VerifiedAccusationFeedback: true));
+var run = new Engine(world, domain, host,
+    new EngineOptions(AdaptiveSourceTrust: true)).Run();
+Console.WriteLine(run.VerifiedSourceTrustUpdates);
+```
+
+On the first verified incident per actor, the engine compares the verdict
+against that actor's *already received* active claims. Source ID is
+`PrivateEvidence.Sender`, not the suspect. Each sender is evaluated at
+most once for the incident, regardless of the number of forwarded roots.
+Sources with incompatible active claims are skipped, as are withdrawn
+claims and the acting agent's own reports. A matching source gains **+8**
+trust units; an incorrect source loses **12** units, clamped to
+`[-100, 100]`. These are design choices, **not learned calibration**.
+The correction applies to subsequent incoming hearsay through the existing
+`AgentMind.Ingest` reliability formula. Past belief values are intentionally
+not rewritten, and the default policy remains unchanged unless other
+experimental flags are independently enabled.
+
+The same incident is processed only once, so repeated accusations cannot
+farm reputation. The prior private trust snapshot stays immutable. The
+integration regression suite exercises correct and incorrect sources,
+duplicate roots, unauthorized feedback routes, unknown incidents,
+retracted and contradictory reports, world/engine opt-out parity,
+deterministic replay and future hearsay weighting.
+
+### Boundaries
+
+- This is supervised feedback from a simulated authoritative world.
+  Different games or agent environments need an independently trustworthy
+  verification mechanism; a text message, LLM answer or subjective clue
+  must **not** be promoted to verified truth.
+- This does not yet learn which *decisions* have good long-term consequences
+  or change social trust based on unaudited success claims.
+- Only an actual accepted accusation of an existing recorded incident can
+  emit a verdict; an accusation without independent evidence could still
+  be accepted by the example world. The cognitive trust mechanism cannot
+  itself establish the justice of that game action.
+- Per-actor processed-incident IDs are retained in memory for the lifetime
+  of the engine instance. Persistence/snapshots and bounded long-term
+  compaction need a separate follow-up before indefinite simulations.
+- The synthetic tests prove correct *implementation of these rules*, not
+  better accuracy or overall NPC intelligence.
+
 ## Next work
 
 Add controlled multi-day studies of belief revision and trust dynamics,

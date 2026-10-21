@@ -44,6 +44,24 @@ static class Program {
         public double EmotionBias(AgentView a,string kind,string? target,long tick)=>0;
     }
 
+    // Deterministic forced-action policy used only to test trusted feedback
+    // through World Authority -> Engine -> one actor's private memory.
+    private sealed class VerifiedTrustProbeDecision(string incident) : IDecisionModule {
+        public string ModuleId=>"test:verified-trust-probe";
+        public double? HearsayStrength {get;private set;}
+        public double? TrustInSource {get;private set;}
+        public Decision Choose(AgentView a,ObservationPacket p,IDecisionContext context) {
+            if(a.Id=="A001"&&p.Tick==48){
+                HearsayStrength=a.Evidence.FirstOrDefault(e=>e.Root=="future-claim")?.LogLikelihood;
+                TrustInSource=a.Trust.GetValueOrDefault("W1");
+            }
+            var proposal=a.Id=="A001"&&p.Tick==24
+                ?new ActionProposal(a.Id,"survival:accuse",Target:"A002",Incident:incident)
+                :new ActionProposal(a.Id,"survival:wait");
+            return new Decision(proposal,"deliberate","trusted-feedback test fixture",1,1);
+        }
+    }
+
     static string LocateRoot(){
         string dir=Directory.GetCurrentDirectory();
         for(int i=0;i<8;i++){
@@ -370,6 +388,116 @@ static class Program {
                 choiceOptIn.World.ResourcesBalanced && choiceBaseline.World.ResourcesBalanced &&
                 choiceOptIn.World.Turns==choiceBaseline.World.Turns,
                 "opt-in social cognition preserves deterministic replay and world conservation");
+
+            // Stage 12: only the trusted World Authority knows whether an
+            // accepted accusation matched the recorded incident actor.
+            var verdictWorld=new SurvivalWorld(d,new SurvivalConfig(91,24,4,
+                VerifiedAccusationFeedback:true,Visibility:0));
+            var incidentAction=verdictWorld.Execute(new ActionProposal("A002",
+                "survival:take",Item:"survival:water"));
+            Check(incidentAction.Accepted && incidentAction.Event?.Incident!=null,
+                "fixture creates an authoritative incident with a known actor");
+            string verifiedIncident=incidentAction.Event!.Incident!;
+            var firstVerdict=verdictWorld.Execute(new ActionProposal("A001",
+                "survival:accuse",Target:"A003",Incident:verifiedIncident));
+            Check(firstVerdict.Accepted&&firstVerdict.VerifiedOutcome?.Incident==verifiedIncident &&
+                firstVerdict.VerifiedOutcome.ActualActor=="A002",
+                "private post-accusation feedback identifies actual actor even after incorrect accusation");
+            var inventedVerdict=verdictWorld.Execute(new ActionProposal("A001",
+                "survival:accuse",Target:"A003",Incident:"CASE-NOT-IN-WORLD"));
+            Check(inventedVerdict.Accepted&&inventedVerdict.VerifiedOutcome==null,
+                "unknown incident receives no authoritative verification");
+            var legacyVerdictWorld=new SurvivalWorld(d,
+                new SurvivalConfig(91,24,4,Visibility:0));
+            var legacyIncident=legacyVerdictWorld.Execute(new ActionProposal("A002",
+                "survival:take",Item:"survival:water"));
+            var legacyVerdict=legacyVerdictWorld.Execute(new ActionProposal("A001",
+                "survival:accuse",Target:"A003",Incident:legacyIncident.Event!.Incident));
+            Check(legacyVerdict.VerifiedOutcome==null,
+                "default world does not reveal hidden incident truth");
+
+            var feedbackMind=new AgentMind();
+            var feedbackPacket=new ObservationPacket(1,1,.5,
+                new Dictionary<string,int>(),new Dictionary<string,bool>(),[],
+                [new Message("evidence","W1",Incident:verifiedIncident,Root:"w1-primary",
+                    Suspect:"A002",LogLikelihood:Math.Log(9),Source:"eyewitness",Tick:1),
+                 new Message("evidence","W1",Incident:verifiedIncident,Root:"w1-forwarded",
+                    Suspect:"A002",LogLikelihood:Math.Log(4),Source:"hearsay",Tick:1),
+                 new Message("evidence","W2",Incident:verifiedIncident,Root:"w2-false",
+                    Suspect:"A003",LogLikelihood:Math.Log(9),Source:"eyewitness",Tick:1),
+                 new Message("evidence","W3",Incident:verifiedIncident,Root:"w3-retracted",
+                    Suspect:"A003",LogLikelihood:Math.Log(9),Source:"eyewitness",Tick:1),
+                 new Message("evidence","W4",Incident:verifiedIncident,Root:"w4-a",
+                    Suspect:"A002",LogLikelihood:Math.Log(9),Source:"eyewitness",Tick:1),
+                 new Message("evidence","W4",Incident:verifiedIncident,Root:"w4-b",
+                    Suspect:"A003",LogLikelihood:Math.Log(9),Source:"eyewitness",Tick:1)]);
+            feedbackMind.Ingest(feedbackPacket);
+            feedbackMind.Ingest(feedbackPacket with {Tick=2,Messages=[
+                new Message("retract","W3",Root:"w3-retracted",Tick:2)]});
+            var oldMindSnapshot=feedbackMind.GetSnapshot();
+            int learned=feedbackMind.LearnFromVerifiedOutcome("A001",firstVerdict.VerifiedOutcome!);
+            var learnedSnapshot=feedbackMind.GetSnapshot();
+            Check(learned==2&&feedbackMind.Trust.GetValueOrDefault("W1")==8&&
+                feedbackMind.Trust.GetValueOrDefault("W2")==-12&&
+                feedbackMind.Trust.GetValueOrDefault("W3")==-4&&
+                !feedbackMind.Trust.ContainsKey("W4"),
+                "source trust rewards correct reports, penalizes false ones and skips withdrawn or contradictory senders");
+            Check(feedbackMind.LearnFromVerifiedOutcome("A001",firstVerdict.VerifiedOutcome!)==0 &&
+                oldMindSnapshot.Trust.Count==1 &&
+                oldMindSnapshot.Trust.GetValueOrDefault("W3")==-4 &&
+                learnedSnapshot.Trust.Count==3,
+                "same verified incident cannot repeatedly increase trust and old snapshot is immutable");
+            feedbackMind.Ingest(feedbackPacket with {Tick=3,Messages=[
+                new Message("evidence","W1",Incident:"CASE-FUTURE",Root:"later-true",
+                    Suspect:"A002",LogLikelihood:Math.Log(10),Source:"hearsay",Tick:3),
+                new Message("evidence","W2",Incident:"CASE-FUTURE",Root:"later-false",
+                    Suspect:"A003",LogLikelihood:Math.Log(10),Source:"hearsay",Tick:3)]});
+            Check(feedbackMind.Evidence["later-true"].LogLikelihood>
+                feedbackMind.Evidence["later-false"].LogLikelihood,
+                "previous verified outcomes alter reliability of subsequent hearsay");
+
+            (EngineResults Run, VerifiedTrustProbeDecision Probe) RunTrustScenario(
+                bool engineLearning,bool worldOracle) {
+                var scenarioWorld=new SurvivalWorld(d,new SurvivalConfig(144,24,4,
+                    Visibility:0,VerifiedAccusationFeedback:worldOracle));
+                var culpritAction=scenarioWorld.Execute(new ActionProposal("A002",
+                    "survival:take",Item:"survival:water"));
+                string caseId=culpritAction.Event!.Incident!;
+                scenarioWorld.ScheduleObservation(1,0,new Message("evidence","W1",
+                    Incident:caseId,Root:"first-trust",Suspect:"A002",
+                    LogLikelihood:Math.Log(12),Source:"eyewitness",Tick:1));
+                scenarioWorld.ScheduleObservation(1,0,new Message("evidence","W2",
+                    Incident:caseId,Root:"second-trust",Suspect:"A003",
+                    LogLikelihood:Math.Log(12),Source:"eyewitness",Tick:1));
+                scenarioWorld.ScheduleObservation(25,0,new Message("evidence","W1",
+                    Incident:"CASE-FUTURE",Root:"future-claim",Suspect:"A004",
+                    LogLikelihood:Math.Log(10),Source:"hearsay",Tick:25));
+                var probe=new VerifiedTrustProbeDecision(caseId);
+                var probeHost=new ModuleHost();
+                probeHost.AddDecision(probe);
+                var result=new Engine(scenarioWorld,d,probeHost,
+                    new EngineOptions(AdaptiveSourceTrust:engineLearning)).Run();
+                return (result,probe);
+            }
+            var trustBaseline=RunTrustScenario(false,true);
+            var trustEnabled=RunTrustScenario(true,true);
+            var trustWithoutVerdict=RunTrustScenario(true,false);
+            var trustReplay=RunTrustScenario(true,true);
+            Check(trustBaseline.Run.TraceHash==trustEnabled.Run.TraceHash &&
+                trustWithoutVerdict.Run.TraceHash==trustBaseline.Run.TraceHash &&
+                trustEnabled.Run.TraceHash==trustReplay.Run.TraceHash &&
+                trustEnabled.Run.World.ResourcesBalanced && trustBaseline.Run.World.ResourcesBalanced,
+                "verified source learning preserves deterministic world actions and conservation");
+            Check(trustBaseline.Run.VerifiedSourceTrustUpdates==0 &&
+                trustWithoutVerdict.Run.VerifiedSourceTrustUpdates==0 &&
+                trustEnabled.Run.VerifiedSourceTrustUpdates==2 &&
+                trustEnabled.Probe.TrustInSource==8 &&
+                trustBaseline.Probe.TrustInSource==0 &&
+                trustWithoutVerdict.Probe.TrustInSource==0 &&
+                trustEnabled.Probe.HearsayStrength>trustBaseline.Probe.HearsayStrength &&
+                trustEnabled.Probe.HearsayStrength==trustReplay.Probe.HearsayStrength,
+                "trusted outcome is actor-private, opt-in, deterministic and changes future hearsay weighting");
+
 
 
 

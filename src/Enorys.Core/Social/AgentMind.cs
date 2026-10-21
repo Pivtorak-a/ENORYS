@@ -17,6 +17,46 @@ public sealed record AgentMindSnapshot(
 
 public sealed class AgentMind {
     private AgentMindSnapshot? cachedSnapshot;
+    // Each verified incident may affect a source only once; does not alter
+    // the old evidence or allow repeated accusations to farm reputation.
+    private readonly HashSet<string> verifiedIncidents=new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Trust feedback from a *trusted, post-action World Adapter verdict*.
+    /// Never call for noisy investigation clues, received messages, or
+    /// ordinary claims. Source claims must already exist in this actor's
+    /// own private evidence ledger. Returns the number of sources updated.
+    /// </summary>
+    public int LearnFromVerifiedOutcome(string actorId,VerifiedIncidentOutcome outcome){
+        if(string.IsNullOrWhiteSpace(actorId))
+            throw new ArgumentException("Actor ID required",nameof(actorId));
+        ArgumentNullException.ThrowIfNull(outcome);
+        if(string.IsNullOrWhiteSpace(outcome.Incident)||
+           string.IsNullOrWhiteSpace(outcome.ActualActor))
+            throw new ArgumentException("Incomplete trusted verdict",nameof(outcome));
+        if(!verifiedIncidents.Add(outcome.Incident))return 0;
+
+        // One appraisal per independent sender per incident, regardless of
+        // how many overlapping claims/rumor roots that sender introduced.
+        // A sender with *incompatible* active suspect claims is skipped rather
+        // than cherry-picking the one that happens to match the verdict.
+        int updated=0;
+        foreach(var group in Evidence.Values.Where(e=>e.Active &&
+                     e.Incident==outcome.Incident &&
+                     !string.IsNullOrWhiteSpace(e.Sender)&&e.Sender!=actorId &&
+                     !string.IsNullOrWhiteSpace(e.Suspect))
+                 .GroupBy(e=>e.Sender,StringComparer.Ordinal)
+                 .OrderBy(g=>g.Key,StringComparer.Ordinal)){
+            var suspects=group.Select(e=>e.Suspect).Distinct(StringComparer.Ordinal).Take(2).ToArray();
+            if(suspects.Length!=1)continue;
+            double delta=suspects[0]==outcome.ActualActor?8:-12;
+            Trust[group.Key]=Math.Clamp(Trust.GetValueOrDefault(group.Key)+delta,-100,100);
+            updated++;
+        }
+        if(updated>0)cachedSnapshot=null;
+        return updated;
+    }
+
     public AgentMindSnapshot GetSnapshot(){
         if(cachedSnapshot!=null)return cachedSnapshot;
         cachedSnapshot=new AgentMindSnapshot(

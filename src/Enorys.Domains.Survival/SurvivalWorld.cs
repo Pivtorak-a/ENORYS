@@ -6,7 +6,8 @@ using Enorys.Core.Runtime;
 namespace Enorys.Domains.Survival;
 
 public sealed record SurvivalConfig(int Seed=42,int Agents=24,int Days=14,int TurnsPerDay=3,
-    double Resources=1,double Visibility=.35,double Misidentification=.08,double Cold=.5,bool Rumors=true);
+    double Resources=1,double Visibility=.35,double Misidentification=.08,double Cold=.5,bool Rumors=true,
+    bool VerifiedAccusationFeedback=false);
 
 internal sealed class Survivor {
     public required string Id;
@@ -191,6 +192,7 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal, IWorldFas
         var evt=new WorldEvent(tick,day,a.Id,k,item.Length==0?null:item,p.Target,p.Incident,p.Root);
         void Spend(string i,int n=1){a.Inv[S+i]-=n;consumed[S+i]+=n;}
         void Restore(string name,double improvement){a.Needs[S+name]=Limit(Need(a,name)-improvement);}
+        VerifiedIncidentOutcome? verifiedOutcome=null;
         switch(k){
             case "eat":Spend("food");Restore("hunger",57);break;
             case "drink":Spend("water");Restore("thirst",65);break;
@@ -233,7 +235,12 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal, IWorldFas
               }
               a.Acted.Add("investigate:"+p.Incident);break;
             case "accuse":
-              bool correct=incidents.TryGetValue(p.Incident!,out var original)&&original.Actor==p.Target;
+              bool known=incidents.TryGetValue(p.Incident!,out var original);
+              bool correct=known&&original!.Actor==p.Target;
+              // Trusted experimental verdict for the ACTING NPC only. No
+              // feedback for incident IDs outside authoritative world history.
+              if(Config.VerifiedAccusationFeedback&&known)
+                  verifiedOutcome=new VerifiedIncidentOutcome(p.Incident!,original!.Actor);
               if(correct)AccurateAccusations++;else FalseAccusations++;
               Send(target?.Id,new Message("accused",a.Id,Incident:p.Incident,Tick:tick));
               a.Acted.Add("accuse:"+p.Incident+":"+p.Target);break;
@@ -257,7 +264,7 @@ public sealed class SurvivalWorld : IWorldAdapter, IObservationSignal, IWorldFas
         if(k is "gather_food" or "collect_water" or "gather_wood" or "scavenge")InvalidatePublicViews(sourcesChanged:true);
         events.Add(evt);
         actions[k]=actions.GetValueOrDefault(k)+1;
-        return new ActionResult(true,"accepted",evt);
+        return new ActionResult(true,"accepted",evt){VerifiedOutcome=verifiedOutcome};
     }
     public void Advance()=>AdvanceSlots(1);
     public void AdvanceSlots(int slots){
