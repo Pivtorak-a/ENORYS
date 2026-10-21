@@ -44,7 +44,16 @@ public record ActionProposal(string Actor,string Kind,string? Item=null,string? 
     string? Incident=null,string? Root=null,string? Suspect=null,double LogLikelihood=0);
 public record Candidate(ActionProposal Proposal,double Utility,string Reason);
 public record Decision(ActionProposal Proposal,string Mode,string Reason,int CandidateCount,double Score);
-public record ActionResult(bool Accepted,string Reason,WorldEvent? Event = null);
+/// <summary>
+/// Trusted post-action verification from the World Adapter to the acting agent.
+/// Not a normal message, witness claim, or evidence from an investigation.
+/// </summary>
+public sealed record VerifiedIncidentOutcome(string Incident,string ActualActor);
+
+public record ActionResult(bool Accepted,string Reason,WorldEvent? Event = null){
+    /// <summary>Optional privileged feedback, only for the actor receiving this result.</summary>
+    public VerifiedIncidentOutcome? VerifiedOutcome {get;init;}
+}
 public record WorldEvent(long Tick,int Day,string Actor,string Kind,string? Item,string? Target,
     string? Incident,string? Root);
 public record WorldMetrics(double AverageHealth,int Alive,int Turns,long CandidateChecks,
