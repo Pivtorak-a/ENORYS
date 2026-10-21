@@ -26,6 +26,23 @@ static class Program {
             _=>Help()
         };
     }
+    // Minimal decision context for isolated experimental social-policy checks.
+    private sealed class SocialPolicyTestContext : IDecisionContext {
+        public ActionProposal? PlannedStep(AgentView a,ObservationPacket p)=>null;
+        public bool CanSpare(AgentView a,string item)=>false;
+        public bool PlanningEnabled=>false;
+        public bool SocialEnabled=>true;
+        public bool LodEnabled=>false;
+        public bool AuditLod=>false;
+        public bool HasAffect=>false;
+        public bool HasCausalGraph=>false;
+        public double CausalBias(AgentView a,string kind,string? target,long tick)=>0;
+        public bool IsAffectNeutral(AgentView a,long tick)=>true;
+        public bool NoPlanCanActivate(AgentView a)=>true;
+        public int CognitiveTickStride=>1;
+        public double EmotionBias(AgentView a,string kind,string? target,long tick)=>0;
+    }
+
     static string LocateRoot(){
         string dir=Directory.GetCurrentDirectory();
         for(int i=0;i<8;i++){
@@ -218,6 +235,93 @@ static class Program {
                 "engine captures deterministic multi-day private evidence revisions");
             Check(firstRevision.Alternatives.Single().Suspect=="A",
                 "belief journal first private observation captured correctly");
+
+            // Stage 12: opt-in social action choice must distinguish one strong
+            // rumor from two independent corroborating witnesses.
+            var policyActor=journalActor with {
+                Inventory=new Dictionary<string,int>(),
+                Needs=new Dictionary<string,double>(),
+                Personality=new Traits(0,0,0,0,0,0),
+                PlanGoal=null,Requests=[],Nearby=[],
+                Evidence=[],UseCompetingBeliefs=true,
+                Acted=new HashSet<string>(StringComparer.Ordinal),
+                Reported=new HashSet<string>(StringComparer.Ordinal),
+                PendingCorrections=[],
+                Debts=new Dictionary<string,int>()
+            };
+            var policyObservation=new ObservationPacket(30,1,.5,
+                new Dictionary<string,int>(),new Dictionary<string,bool>(),[],[]);
+            var socialContext=new SocialPolicyTestContext();
+            var policyBehavior=new SurvivalBehavior();
+            var witnessOne=new PrivateEvidence("claim-1","CASE-POLICY","A002",
+                Math.Log(25),"eyewitness","W1",5);
+            var witnessTwo=new PrivateEvidence("claim-2","CASE-POLICY","A002",
+                Math.Log(16),"eyewitness","W2",6);
+            var opposing=new PrivateEvidence("claim-opposing","CASE-POLICY","A003",
+                Math.Log(25),"eyewitness","W3",5);
+            var withOne=policyActor with {Evidence=new[]{witnessOne}};
+            var singlePolicy=CompetingBeliefPolicy.Evaluate(withOne,30);
+            Check(singlePolicy!=null&&!singlePolicy.MayAccuse &&
+                policyBehavior.Choose(withOne,policyObservation,socialContext)
+                    .Proposal.Kind=="survival:investigate",
+                "one strong witness leads to inquiry, not direct accusation");
+            var oldSocial=policyBehavior.Choose(withOne with {UseCompetingBeliefs=false},
+                policyObservation,socialContext);
+            Check(oldSocial.Proposal.Kind=="survival:accuse",
+                "legacy one-witness accusation remains available only when policy disabled");
+            var corroborated=policyActor with {Evidence=new[]{witnessOne,witnessTwo}};
+            var twoPolicy=CompetingBeliefPolicy.Evaluate(corroborated,30);
+            Check(twoPolicy!=null&&twoPolicy.MayAccuse &&
+                policyBehavior.Choose(corroborated,policyObservation,socialContext)
+                    .Proposal.Kind=="survival:accuse",
+                "independent corroboration enables higher-confidence accusation");
+            var disputed=policyActor with {Evidence=new[]{witnessOne,opposing}};
+            var disputedPolicy=CompetingBeliefPolicy.Evaluate(disputed,30);
+            Check(disputedPolicy!=null&&!disputedPolicy.MayAccuse &&
+                !disputedPolicy.MayTell &&
+                policyBehavior.Choose(disputed,policyObservation,socialContext)
+                    .Proposal.Kind=="survival:investigate",
+                "competing plausible suspects cause inquiry rather than accusation");
+            var repeatedRoot=policyActor with {
+                Evidence=new[]{
+                    witnessOne,witnessOne with { Sender="OTHER",Source="hearsay" }
+                }
+            };
+            Check(CompetingBeliefPolicy.Evaluate(repeatedRoot,30)?.MayAccuse==false,
+                "forwarding the same root does not manufacture independent corroboration");
+            var withdrawn=policyActor with {
+                Evidence=new[]{witnessOne with {Active=false},witnessTwo}
+            };
+            Check(CompetingBeliefPolicy.Evaluate(withdrawn,30)?.MayAccuse==false,
+                "authorized retraction withdraws accusation permission");
+            var abstain=policyActor with {Evidence=[]};
+            Check(CompetingBeliefPolicy.Evaluate(abstain,30)==null &&
+                policyBehavior.Choose(abstain,policyObservation,socialContext)
+                    .Proposal.Kind!="survival:accuse",
+                "no private evidence produces no social accusation");
+
+            EngineResults RunBeliefChoiceScenario(bool enabled){
+                var socialWorld=new SurvivalWorld(d,
+                    new SurvivalConfig(87,24,6,3,.65));
+                socialWorld.ScheduleObservation(1,0,new Message("evidence","W1",
+                    Incident:"CASE-CHOICE",Root:"first-choice",Suspect:"A002",
+                    LogLikelihood:Math.Log(25),Source:"eyewitness",Tick:1));
+                socialWorld.ScheduleObservation(25,0,new Message("evidence","W2",
+                    Incident:"CASE-CHOICE",Root:"second-choice",Suspect:"A003",
+                    LogLikelihood:Math.Log(25),Source:"eyewitness",Tick:25));
+                socialWorld.ScheduleObservation(73,0,new Message("retract","W1",
+                    Root:"first-choice",Tick:73));
+                return new Engine(socialWorld,d,host,
+                    new EngineOptions(CompetingBeliefPolicy:enabled)).Run();
+            }
+            var choiceBaseline=RunBeliefChoiceScenario(false);
+            var choiceOptIn=RunBeliefChoiceScenario(true);
+            var choiceReplay=RunBeliefChoiceScenario(true);
+            Check(choiceOptIn.TraceHash==choiceReplay.TraceHash &&
+                choiceOptIn.World.ResourcesBalanced && choiceBaseline.World.ResourcesBalanced &&
+                choiceOptIn.World.Turns==choiceBaseline.World.Turns,
+                "opt-in social cognition preserves deterministic replay and world conservation");
+
 
 
             var beforeInvalid=extra.GetPrivateAgent(0);
