@@ -103,6 +103,48 @@ static class Program {
             Check(mind.Evidence.Count==1,"one eyewitness root forwarded twice remains one evidence");
             mind.Ingest(packet with {Tick=2,Messages=[new Message("retract","A002",Root:"R07",Tick:2)]});
             Check(!mind.Evidence["R07"].Active,"source-authorized retraction deactivates private belief");
+
+            // Stage 12: alternative hypotheses use actor-private reports only.
+            var claims=new PrivateEvidence[]{
+                new("root-a1","CASE-12","A",Math.Log(25),"eyewitness","W1",5),
+                new("root-a1","CASE-12","A",Math.Log(25),"hearsay","W2",5),
+                new("root-b1","CASE-12","B",Math.Log(4),"eyewitness","W3",5),
+                new("root-conflict","CASE-12","A",Math.Log(100),"trace","W4",5),
+                new("root-conflict","CASE-12","B",Math.Log(100),"trace","W4",5),
+                new("other","CASE-OTHER","C",Math.Log(100),"eyewitness","W5",5)
+            };
+            var comparison=IncidentBeliefEstimator.Compare(claims,"CASE-12",5);
+            Check(comparison.Alternatives.Count==2 &&
+                comparison.Alternatives[0].Suspect=="A" &&
+                comparison.Alternatives.All(h=>h.IndependentRoots==1) &&
+                Math.Abs(comparison.UnknownShare+comparison.Alternatives.Sum(h=>h.Share)-1)<1e-12,
+                "exclusive private hypotheses normalize and deduplicate source roots");
+            var moreIndependent=IncidentBeliefEstimator.Compare(
+                claims.Append(new PrivateEvidence("root-a2","CASE-12","A",
+                    Math.Log(12),"eyewitness","W6",5)).ToArray(),"CASE-12",5);
+            Check(moreIndependent.Alternatives.First(h=>h.Suspect=="A").Share>
+                comparison.Alternatives.First(h=>h.Suspect=="A").Share,
+                "independent positive evidence increases alternative support");
+            var negative=IncidentBeliefEstimator.Compare(
+                claims.Append(new PrivateEvidence("root-a-negative","CASE-12","A",
+                    -Math.Log(10),"trace","W7",5)).ToArray(),"CASE-12",5);
+            Check(negative.Alternatives.First(h=>h.Suspect=="A").Share<
+                comparison.Alternatives.First(h=>h.Suspect=="A").Share,
+                "contradictory negative evidence reduces suspect support");
+            var revisedBeliefs=IncidentBeliefEstimator.Compare(
+                claims.Select(e=>e.Root=="root-a1"?e with {Active=false}:e).ToArray(),
+                "CASE-12",5);
+            Check(revisedBeliefs.Alternatives.All(h=>h.Suspect!="A") &&
+                revisedBeliefs.Alternatives.Single().Suspect=="B",
+                "retraction removes unsupported alternative and preserves other sources");
+            var aged=IncidentBeliefEstimator.Compare(claims,"CASE-12",20000);
+            Check(aged.Alternatives.First(h=>h.Suspect=="A").Share<
+                comparison.Alternatives.First(h=>h.Suspect=="A").Share,
+                "stale evidence decays without inventing world observations");
+            var absent=IncidentBeliefEstimator.Compare(claims,"CASE-MISSING",5);
+            Check(absent.UnknownShare==1 && absent.Alternatives.Count==0,
+                "unknown hypothesis retains full weight without private evidence");
+
             var beforeInvalid=extra.GetPrivateAgent(0);
             var invalidProposal=extra.Execute(new ActionProposal(beforeInvalid.Id,"survival:boil"));
             var afterInvalid=extra.GetPrivateAgent(0);
