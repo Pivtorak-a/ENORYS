@@ -89,6 +89,14 @@ public interface IDecisionContext {
     int CognitiveTickStride {get;}
     double EmotionBias(AgentView agent,string actionKind,string? target,long tick);
 }
+/// <summary>
+/// Optional add-on interface for trusted decision contexts. Existing external
+/// IDecisionContext implementations continue compiling unchanged.
+/// </summary>
+public interface IExperienceDecisionContext {
+    bool HasExperiencePolicy {get;}
+    double ExperienceBias(AgentView actor,ActionProposal candidate);
+}
 public interface IFastDecisionModule {
     Decision? TryFastDecision(AgentView agent, ObservationPacket observations, IDecisionContext context);
 }
