@@ -108,6 +108,7 @@ ENORYS is developed through reproducible experiments rather than performance or 
 - **Opt-in private belief timeline:** record bounded, evidence-driven revisions across simulated days for debugging and research; regression tests ensure normal NPC choices and outcomes are unchanged. [Experiment 012](docs/EXPERIMENT-012-CONFLICTING-PRIVATE-EVIDENCE.md).
 - **Experimental belief-aware social policy:** optionally use alternative private hypotheses to prefer investigation over unsupported accusation, with two-independent-source gating and an A/B replay CLI. Default NPC choices are unchanged. [Experiment 012](docs/EXPERIMENT-012-CONFLICTING-PRIVATE-EVIDENCE.md).
 - **Optional verified-source learning:** a trusted survival-world post-accusation verdict can adjust the acting NPC's private trust in prior witnesses, affecting later hearsay. This uses a synthetic verification oracle and is **off by default**. [Trust feedback limits](docs/EXPERIMENT-012-CONFLICTING-PRIVATE-EVIDENCE.md#verified-outcome-source-trust-fourth-increment).
+- **Experiment 013 — episodic outcomes:** optional bounded actor-private history of actions, immediate outcomes, and changes observed at the next activation; preserves baseline decisions. The proxy index is diagnostic, **not causal reward or policy learning**. [Experiment 013](docs/EXPERIMENT-013-EPISODIC-OUTCOMES.md).
 
 These measurements depend on the documented scenarios, hardware, and configurations. They do not establish general human-like intelligence, real-time game performance, or advantages over other agent frameworks.
 
