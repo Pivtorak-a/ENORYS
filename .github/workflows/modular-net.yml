@@ -25,6 +25,8 @@ jobs:
         run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- compare-beliefs > /tmp/enorys-belief-ab.json
       - name: Compare episodic observation parity (research-only)
         run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- compare-episodes > /tmp/enorys-episodes-ab.json
+      - name: Compare adaptive action preferences (descriptive A/B)
+        run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- compare-learning
       - name: Compare optional emotional map overhead
         run: dotnet run --project tests/Enorys.Integration/Enorys.Integration.csproj -c Release --no-build -- bench-acm
       - name: Compare event-aware scheduler load
