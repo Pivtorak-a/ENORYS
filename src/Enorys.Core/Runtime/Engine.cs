@@ -13,7 +13,8 @@ public sealed record EngineOptions(bool Planning=true,bool Social=true,bool Cogn
     bool HybridUseTimingWheel=true,bool CertifiedDecisions=false,bool AuditCertificates=false,
     bool AdaptiveCertificateAdmission=false,bool TrackPrivateBeliefs=false,
     int MaxBeliefRevisionsPerAgent=64,bool CompetingBeliefPolicy=false,
-    bool AdaptiveSourceTrust=false);
+    bool AdaptiveSourceTrust=false,bool TrackActionEpisodes=false,
+    int MaxActionEpisodesPerAgent=32);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
     string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}
@@ -30,11 +31,14 @@ public sealed record EngineResults(WorldMetrics World,long Automatic,long Delibe
     public long CausalDecisions {get;init;}
     public IReadOnlyList<PrivateBeliefRevision> BeliefRevisions {get;init;}=[];
     public long VerifiedSourceTrustUpdates {get;init;}
+    public long TotalActionEpisodes {get;init;}
+    public IReadOnlyList<ActionEpisode> ActionEpisodes {get;init;}=[];
 }
 /// <summary>Core owns cognition, World Adapter owns truth and material state.</summary>
 public sealed class Engine {
     private readonly IWorldAdapter world;
     private readonly PrivateBeliefTimeline? beliefTimeline;
+    private readonly EpisodicOutcomeMemory? episodeMemory;
     private readonly AgentMind[] minds;
     private readonly Planner planner;
     private readonly IDecisionModule decision;
@@ -116,6 +120,8 @@ public sealed class Engine {
         this.world=world;plannerDomain=domain;options=opts??new();
         if(options.TrackPrivateBeliefs)
             beliefTimeline=new PrivateBeliefTimeline(options.MaxBeliefRevisionsPerAgent);
+        if(options.TrackActionEpisodes)
+            episodeMemory=new EpisodicOutcomeMemory(options.MaxActionEpisodesPerAgent);
         planner=new Planner(domain);
         decision=host.Decisions.FirstOrDefault()??throw new InvalidOperationException("No decision module installed");
         minds=Enumerable.Range(0,world.AgentCount).Select(_=>new AgentMind()).ToArray();
@@ -205,6 +211,9 @@ public sealed class Engine {
             messagesProcessed+=obs.Messages.Count;
             memoryEvidenceProcessed+=obs.Messages.Count(m=>m.Type is "evidence" or "retract");
             var actor=PrivateSnapshot(world.GetPrivateAgent(index),obs,mind);
+            // Close the previous action's deferred observational window before
+            // any decision or new action alters this actor's material state.
+            episodeMemory?.BeginActivation(actor);
             beliefTimeline?.Observe(actor,obs);
             if(obs.Messages.Count>0)foreach(var affect in affects){
                 affect.Receive(actor,obs with {Tick=obs.Tick/cognitiveTickStride});
@@ -284,6 +293,11 @@ public sealed class Engine {
             }
             candidateChecks+=choice.CandidateCount;
             var result=world.Execute(choice.Proposal);
+            // World state is read only from the same actor's private adapter
+            // snapshot; the observer never sees authoritative incident truth.
+            if(episodeMemory!=null)
+                episodeMemory.Record(actor,choice.Proposal,result,
+                    world.GetPrivateAgent(index),obs.Tick);
             // A trusted, accepted post-action verdict is visible only to
             // this acting agent; ordinary witness messages can never invoke
             // the verification pathway.
@@ -353,7 +367,9 @@ public sealed class Engine {
                 CertificateThrottled=certificateThrottled,
                 CausalObservations=causalObservations,CausalDecisions=causalDecisions,
                 BeliefRevisions=beliefTimeline?.InspectAll()??[],
-                VerifiedSourceTrustUpdates=verifiedSourceTrustUpdates
+                VerifiedSourceTrustUpdates=verifiedSourceTrustUpdates,
+                TotalActionEpisodes=episodeMemory?.TotalRecorded??0,
+                ActionEpisodes=episodeMemory?.InspectAll()??[]
             };
     }
 }

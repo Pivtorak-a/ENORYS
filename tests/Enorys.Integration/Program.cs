@@ -24,6 +24,7 @@ static class Program {
             "compare-native"=>CompareNative(domain),
             "test"=>Tests(root,domain,host),
             "compare-beliefs"=>CompareBeliefPolicies(domain,host),
+            "compare-episodes"=>CompareEpisodes(domain,host),
             _=>Help()
         };
     }
@@ -124,6 +125,110 @@ static class Program {
         return 0;
     }
 
+    // Stage 013: observational episodic history. Zero influence on choices.
+    static void TestEpisodicOutcomes(DomainRegistry domain,ModuleHost host){
+        var world=new SurvivalWorld(domain,new SurvivalConfig(91,24,2));
+        var original=world.GetPrivateAgent(0) with {
+            Health=80,
+            Needs=new Dictionary<string,double> {["hunger"]=40,["thirst"]=50},
+            Inventory=new Dictionary<string,int> {["water"]=2}
+        };
+        var changed=original with {
+            Health=84,
+            Needs=new Dictionary<string,double> {["hunger"]=30,["thirst"]=20},
+            Inventory=new Dictionary<string,int> {["water"]=1}
+        };
+        var next=original with {
+            Health=83,
+            Needs=new Dictionary<string,double> {["hunger"]=35,["thirst"]=25},
+            Inventory=new Dictionary<string,int> {["water"]=2}
+        };
+        var memory=new EpisodicOutcomeMemory(maxEpisodesPerActor:2);
+        var action=new ActionProposal(original.Id,"survival:drink");
+        memory.Record(original,action,new ActionResult(true,"accepted"),changed,0);
+        var first=memory.Inspect(original.Id).Single();
+        Check(first.Immediate.HealthDelta==4 &&
+            first.Immediate.NeedPressureDelta==-20 &&
+            first.Immediate.InventoryUnitsDelta==-1 &&
+            Math.Abs(first.Immediate.ProxyScore-.7)<1e-12 &&
+            first.NextActivation==null,
+            "episodic outcome captures immediate observable needs, health and inventory");
+        memory.BeginActivation(next);
+        var closed=memory.Inspect(original.Id).Single();
+        Check(closed.NextActivation!=null &&
+            closed.NextActivation.HealthDelta==-1 &&
+            closed.NextActivation.NeedPressureDelta==5 &&
+            closed.NextActivation.InventoryUnitsDelta==1 &&
+            Math.Abs(closed.NextActivation.ProxyScore+.1)<1e-12,
+            "next activation records intervening drift, not causal reward");
+        Check(first.NextActivation==null,
+            "previous episode export stays immutable when delayed outcome arrives");
+        memory.Record(next,action,new ActionResult(false,"no-resource"),next,24);
+        memory.BeginActivation(next);
+        Check(memory.Inspect(original.Id)[1].Accepted==false &&
+            memory.Inspect(original.Id)[1].Immediate.ProxyScore==0,
+            "rejected action records zero immediate physical change");
+        memory.Record(next,action,new ActionResult(true,"accepted"),changed,48);
+        var capped=memory.Inspect(original.Id);
+        Check(memory.TotalRecorded==3 && memory.RetainedEpisodes==2 &&
+            capped.Count==2 && capped[0].Tick==24 && capped[1].Tick==48 &&
+            memory.Inspect("different-actor").Count==0 &&
+            memory.InspectAll().All(x=>x.AgentId==original.Id),
+            "per-agent bounded retention and private actor-scoped inspection");
+        bool rejectedCap=false;
+        try{_ = new EpisodicOutcomeMemory(0);}catch(ArgumentOutOfRangeException){rejectedCap=true;}
+        Check(rejectedCap,"invalid journal capacity rejected");
+
+        EngineResults RunWithEpisodes(int seed,bool enabled){
+            var sim=new SurvivalWorld(domain,new SurvivalConfig(seed,24,6,3,.65));
+            return new Engine(sim,domain,host,
+                new EngineOptions(TrackActionEpisodes:enabled,
+                    MaxActionEpisodesPerAgent:3)).Run();
+        }
+        foreach(int seed in new[]{44,83,122}){
+            var baseline=RunWithEpisodes(seed,false);
+            var tracked=RunWithEpisodes(seed,true);
+            var repeat=RunWithEpisodes(seed,true);
+            Check(baseline.TraceHash==tracked.TraceHash &&
+                baseline.World.Events==tracked.World.Events &&
+                baseline.World.ResourcesBalanced && tracked.World.ResourcesBalanced &&
+                tracked.TraceHash==repeat.TraceHash,
+                "stage-13 observation-only integration preserves world and action parity seed="+seed);
+            Check(baseline.TotalActionEpisodes==0 && baseline.ActionEpisodes.Count==0 &&
+                tracked.TotalActionEpisodes>0 &&
+                tracked.ActionEpisodes.Count<=24*3 &&
+                tracked.ActionEpisodes.All(x=>x.Immediate.ProxyScore is >=-10 and <=10) &&
+                JsonSerializer.Serialize(tracked.ActionEpisodes)==
+                    JsonSerializer.Serialize(repeat.ActionEpisodes),
+                "bounded deterministic actor-private episode history seed="+seed);
+        }
+    }
+
+    // Controlled A/B output; not a claim of more intelligent decisions.
+    static int CompareEpisodes(DomainRegistry domain,ModuleHost host){
+        foreach(int seed in new[]{44,83,122}){
+            EngineResults Run(bool tracked){
+                var sim=new SurvivalWorld(domain,new SurvivalConfig(seed,24,6,3,.65));
+                return new Engine(sim,domain,host,new EngineOptions(
+                    TrackActionEpisodes:tracked,MaxActionEpisodesPerAgent:6)).Run();
+            }
+            var baseline=Run(false);
+            var logged=Run(true);
+            if(baseline.TraceHash!=logged.TraceHash ||
+                !baseline.World.ResourcesBalanced||!logged.World.ResourcesBalanced)
+                throw new InvalidOperationException("Logging changed world action trace or resources");
+            Console.WriteLine(JsonSerializer.Serialize(new {
+                seed,agents=24,days=6,loggingDoesNotAlterActions=true,
+                recorded=logged.TotalActionEpisodes,retained=logged.ActionEpisodes.Count,
+                completedFollowups=logged.ActionEpisodes.Count(x=>x.NextActivation!=null),
+                meanImmediateProxy=logged.ActionEpisodes.Count==0?0:
+                    logged.ActionEpisodes.Average(x=>x.Immediate.ProxyScore),
+                limitations="Descriptive diagnostics, not causal reward or policy learning."
+            }));
+        }
+        return 0;
+    }
+
     static int Simulate(DomainRegistry d,ModuleHost host,string[] args){
         int seed=args.Length>1?int.Parse(args[1]):42;
         int agents=args.Length>2?int.Parse(args[2]):24;
@@ -144,6 +249,7 @@ static class Program {
     static void Check(bool condition,string label){if(!condition)throw new Exception("FAIL: "+label);Console.WriteLine("PASS "+label);}
     static int Tests(string root,DomainRegistry d,ModuleHost host){
         try{
+            TestEpisodicOutcomes(d,host);
             var single=Run(d,host,seed:42,days:10);
             Check(single.World.Turns==24*10*3,"all scheduled turns");
             Check(single.World.ResourcesBalanced,"conservation across recipes and transfers");
