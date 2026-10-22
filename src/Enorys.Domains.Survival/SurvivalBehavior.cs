@@ -122,12 +122,23 @@ public sealed partial class SurvivalBehavior : IEnorysModule, IDecisionModule, I
                 }
             }
         }
+        // Controlled stage-13 learning only affects non-social self-care and
+        // resource preparation. No reinforcement of accusations or taking
+        // communal resources from the simplistic inventory proxy.
+        double ExperienceScore(Candidate candidate)=>
+            candidate.Proposal.Kind is "survival:drink" or "survival:eat" or
+                "survival:sleep" or "survival:relieve" or "survival:warm" or
+                "survival:wash" or "survival:treat" or "survival:bandage" or
+                "survival:boil" or "survival:cook" or "survival:gather_food" or
+                "survival:collect_water" or "survival:gather_wood"
+            ?(ctx as IExperienceDecisionContext)?.ExperienceBias(a,candidate.Proposal)??0
+            :0;
         if(choiceKernel!=null){
             if(candidates.Count>64)throw new InvalidOperationException("Candidate buffer exceeded.");
             Span<double> values=stackalloc double[64];
             for(int i=0;i<candidates.Count;i++){
                 var c=candidates[i];
-                values[i]=c.Utility+ctx.EmotionBias(a,c.Proposal.Kind,c.Proposal.Target,p.Tick)+ctx.CausalBias(a,c.Proposal.Kind,c.Proposal.Target,p.Tick);
+                values[i]=c.Utility+ctx.EmotionBias(a,c.Proposal.Kind,c.Proposal.Target,p.Tick)+ctx.CausalBias(a,c.Proposal.Kind,c.Proposal.Target,p.Tick)+ExperienceScore(c);
             }
             int winner=choiceKernel.ArgMax(values[..candidates.Count]);
             if(winner<0||winner>=candidates.Count)
@@ -136,10 +147,10 @@ public sealed partial class SurvivalBehavior : IEnorysModule, IDecisionModule, I
             return new Decision(result.Proposal,"deliberate",result.Reason,candidates.Count,values[winner]);
         }
         var selected=candidates[0];
-        double best=selected.Utility+ctx.EmotionBias(a,selected.Proposal.Kind,selected.Proposal.Target,p.Tick)+ctx.CausalBias(a,selected.Proposal.Kind,selected.Proposal.Target,p.Tick);
+        double best=selected.Utility+ctx.EmotionBias(a,selected.Proposal.Kind,selected.Proposal.Target,p.Tick)+ctx.CausalBias(a,selected.Proposal.Kind,selected.Proposal.Target,p.Tick)+ExperienceScore(selected);
         for(int i=1;i<candidates.Count;i++){
             var x=candidates[i];
-            double score=x.Utility+ctx.EmotionBias(a,x.Proposal.Kind,x.Proposal.Target,p.Tick)+ctx.CausalBias(a,x.Proposal.Kind,x.Proposal.Target,p.Tick);
+            double score=x.Utility+ctx.EmotionBias(a,x.Proposal.Kind,x.Proposal.Target,p.Tick)+ctx.CausalBias(a,x.Proposal.Kind,x.Proposal.Target,p.Tick)+ExperienceScore(x);
             if(score>best){selected=x;best=score;}
         }
         return new Decision(selected.Proposal,"deliberate",selected.Reason,candidates.Count,best);
@@ -179,6 +190,7 @@ public sealed partial class SurvivalBehavior : IEnorysModule, IDecisionModule, I
     }
 
     public Decision? TryFastDecision(AgentView a,ObservationPacket p,IDecisionContext ctx){
+        if(ctx is IExperienceDecisionContext {HasExperiencePolicy:true})return null;
         if(ctx.SocialEnabled&&a.UseCompetingBeliefs)return null;
         if(ctx.HasAffect || ctx.HasCausalGraph || a.Health<45||a.Infection>45||a.Injury>50||a.PlanGoal==null)return null;
         if(ctx.SocialEnabled && (a.Evidence.Any(x=>x.Active)||a.Requests.Count>0||
