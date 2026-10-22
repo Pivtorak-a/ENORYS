@@ -90,7 +90,7 @@ public sealed class EpisodicOutcomeMemory {
     /// Call once, after Execute, for each actor turn. The after-state must
     /// belong to the same actor and come from that actor's private view.
     /// </summary>
-    public void Record(AgentView before,ActionProposal proposed,
+    public ActionEpisode Record(AgentView before,ActionProposal proposed,
         ActionResult result,AgentView after,long tick){
         ArgumentNullException.ThrowIfNull(before);
         ArgumentNullException.ThrowIfNull(proposed);
@@ -115,6 +115,7 @@ public sealed class EpisodicOutcomeMemory {
         recorded++;
         if(actor.Episodes.Count>maxEpisodesPerActor)
             actor.Episodes.RemoveAt(0);
+        return episode;
     }
 
     /// <summary>Actor-scoped diagnostics, returned as an immutable snapshot.</summary>
