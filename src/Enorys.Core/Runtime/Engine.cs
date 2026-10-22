@@ -14,7 +14,8 @@ public sealed record EngineOptions(bool Planning=true,bool Social=true,bool Cogn
     bool AdaptiveCertificateAdmission=false,bool TrackPrivateBeliefs=false,
     int MaxBeliefRevisionsPerAgent=64,bool CompetingBeliefPolicy=false,
     bool AdaptiveSourceTrust=false,bool TrackActionEpisodes=false,
-    int MaxActionEpisodesPerAgent=32);
+    int MaxActionEpisodesPerAgent=32,bool AdaptiveActionPolicy=false,
+    int MaxExperiencePreferencesPerAgent=48);
 public sealed record EngineResults(WorldMetrics World,long Automatic,long Deliberate,long CandidateChecks,
     int PlansCompleted,int PlansAbandoned,int Divergences,long ElapsedDecisionTicks,
     string TraceHash,IReadOnlyList<string> History){public long SkippedDecisions {get;init;} public long WakeInterruptions {get;init;}
@@ -33,12 +34,15 @@ public sealed record EngineResults(WorldMetrics World,long Automatic,long Delibe
     public long VerifiedSourceTrustUpdates {get;init;}
     public long TotalActionEpisodes {get;init;}
     public IReadOnlyList<ActionEpisode> ActionEpisodes {get;init;}=[];
+    public long ExperienceUpdates {get;init;}
+    public long RetainedExperiencePreferences {get;init;}
 }
 /// <summary>Core owns cognition, World Adapter owns truth and material state.</summary>
 public sealed class Engine {
     private readonly IWorldAdapter world;
     private readonly PrivateBeliefTimeline? beliefTimeline;
     private readonly EpisodicOutcomeMemory? episodeMemory;
+    private readonly AdaptiveExperiencePolicy? experiencePolicy;
     private readonly AgentMind[] minds;
     private readonly Planner planner;
     private readonly IDecisionModule decision;
@@ -63,7 +67,13 @@ public sealed class Engine {
     private int plansCompleted,plansAbandoned,divergences;
     private readonly List<string> history=new();
 
-    private sealed class Context(Engine engine,AgentMind mind): IDecisionContext {
+    private sealed class Context(Engine engine,AgentMind mind,AgentView actor):
+        IDecisionContext,IExperienceDecisionContext {
+        private readonly string experienceSituation=engine.experiencePolicy!=null
+            ?AdaptiveExperiencePolicy.Situation(actor):"";
+        public bool HasExperiencePolicy=>engine.experiencePolicy!=null;
+        public double ExperienceBias(AgentView a,ActionProposal candidate)=>
+            engine.experiencePolicy?.Bias(a.Id,experienceSituation,candidate)??0;
         public bool PlanningEnabled=>engine.options.Planning;
         public bool SocialEnabled=>engine.options.Social;
         public bool LodEnabled=>engine.options.CognitiveLod;
@@ -120,8 +130,10 @@ public sealed class Engine {
         this.world=world;plannerDomain=domain;options=opts??new();
         if(options.TrackPrivateBeliefs)
             beliefTimeline=new PrivateBeliefTimeline(options.MaxBeliefRevisionsPerAgent);
-        if(options.TrackActionEpisodes)
+        if(options.TrackActionEpisodes||options.AdaptiveActionPolicy)
             episodeMemory=new EpisodicOutcomeMemory(options.MaxActionEpisodesPerAgent);
+        if(options.AdaptiveActionPolicy)
+            experiencePolicy=new AdaptiveExperiencePolicy(options.MaxExperiencePreferencesPerAgent);
         planner=new Planner(domain);
         decision=host.Decisions.FirstOrDefault()??throw new InvalidOperationException("No decision module installed");
         minds=Enumerable.Range(0,world.AgentCount).Select(_=>new AgentMind()).ToArray();
@@ -229,7 +241,7 @@ public sealed class Engine {
                     causalObservations+=obs.Messages.Count;
                 }
             }
-            var ctx=new Context(this,mind);
+            var ctx=new Context(this,mind,actor);
             var before=System.Diagnostics.Stopwatch.GetTimestamp();
             Enorys.Abstractions.Decision choice;
             ActionChoiceCertificate? proof=null;
@@ -295,9 +307,11 @@ public sealed class Engine {
             var result=world.Execute(choice.Proposal);
             // World state is read only from the same actor's private adapter
             // snapshot; the observer never sees authoritative incident truth.
-            if(episodeMemory!=null)
-                episodeMemory.Record(actor,choice.Proposal,result,
+            if(episodeMemory!=null){
+                var episode=episodeMemory.Record(actor,choice.Proposal,result,
                     world.GetPrivateAgent(index),obs.Tick);
+                experiencePolicy?.Learn(actor,choice.Proposal,episode);
+            }
             // A trusted, accepted post-action verdict is visible only to
             // this acting agent; ordinary witness messages can never invoke
             // the verification pathway.
@@ -369,7 +383,9 @@ public sealed class Engine {
                 BeliefRevisions=beliefTimeline?.InspectAll()??[],
                 VerifiedSourceTrustUpdates=verifiedSourceTrustUpdates,
                 TotalActionEpisodes=episodeMemory?.TotalRecorded??0,
-                ActionEpisodes=episodeMemory?.InspectAll()??[]
+                ActionEpisodes=episodeMemory?.InspectAll()??[],
+                ExperienceUpdates=experiencePolicy?.TotalUpdates??0,
+                RetainedExperiencePreferences=experiencePolicy?.RetainedPreferences??0
             };
     }
 }
