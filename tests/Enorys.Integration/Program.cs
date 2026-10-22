@@ -25,6 +25,7 @@ static class Program {
             "test"=>Tests(root,domain,host),
             "compare-beliefs"=>CompareBeliefPolicies(domain,host),
             "compare-episodes"=>CompareEpisodes(domain,host),
+            "compare-learning"=>CompareAdaptiveLearning(domain,host),
             _=>Help()
         };
     }
@@ -61,6 +62,27 @@ static class Program {
                 :new ActionProposal(a.Id,"survival:wait");
             return new Decision(proposal,"deliberate","trusted-feedback test fixture",1,1);
         }
+    }
+
+    // Test-only experience context: validates that a controlled utility
+    // bias can actually alter the selected action without touching the world.
+    private sealed class ExperienceProbeContext(bool enabled):IDecisionContext,IExperienceDecisionContext {
+        public ActionProposal? PlannedStep(AgentView a,ObservationPacket packet)=>null;
+        public bool CanSpare(AgentView a,string item)=>false;
+        public bool PlanningEnabled=>false;
+        public bool SocialEnabled=>false;
+        public bool LodEnabled=>false;
+        public bool AuditLod=>false;
+        public bool HasAffect=>false;
+        public bool HasCausalGraph=>false;
+        public int CognitiveTickStride=>1;
+        public bool IsAffectNeutral(AgentView a,long tick)=>true;
+        public bool NoPlanCanActivate(AgentView a)=>true;
+        public double EmotionBias(AgentView a,string kind,string? target,long tick)=>0;
+        public double CausalBias(AgentView a,string kind,string? target,long tick)=>0;
+        public bool HasExperiencePolicy=>enabled;
+        public double ExperienceBias(AgentView a,ActionProposal proposal)=>
+            enabled && proposal.Kind=="survival:drink"?.4:0;
     }
 
     static string LocateRoot(){
@@ -123,6 +145,96 @@ static class Program {
             agents=24,days=7,rows
         },new JsonSerializerOptions{WriteIndented=true}));
         return 0;
+    }
+
+    static void TestAdaptiveExperiencePolicy(DomainRegistry domain,ModuleHost host){
+        var baseActor=new SurvivalWorld(domain,new SurvivalConfig(104,24,2))
+            .GetPrivateAgent(0) with {
+                Needs=new Dictionary<string,double>{
+                    ["survival:thirst"]=65,["survival:hunger"]=35
+                },
+                Inventory=new Dictionary<string,int>{
+                    ["survival:water"]=1
+                }
+            };
+        var learner=new AdaptiveExperiencePolicy(maxEntriesPerActor:2,
+            learningRate:.5,maximumUtilityBias:.4);
+        var drink=new ActionProposal(baseActor.Id,"survival:drink");
+        var eat=new ActionProposal(baseActor.Id,"survival:eat");
+        string thirsty=AdaptiveExperiencePolicy.Situation(baseActor);
+        var good=new ActionEpisode(baseActor.Id,1,drink.Kind,null,true,
+            "accepted",new EpisodeOutcome(0,-20,-1,2),null);
+        Check(learner.Bias(baseActor.Id,thirsty,drink)==0,
+            "adaptive learner has a zero cold start");
+        learner.Learn(baseActor,drink,good);
+        Check(learner.Bias(baseActor.Id,thirsty,drink)==0,
+            "single unconfirmed experience does not change policy");
+        learner.Learn(baseActor,drink,good);
+        double positive=learner.Bias(baseActor.Id,thirsty,drink);
+        Check(positive>0&&positive<=.4&&learner.Bias(baseActor.Id,thirsty,eat)==0 &&
+            learner.Bias("other-agent",thirsty,drink)==0,
+            "repeat private experience creates bounded action-specific preference");
+        var differentSituation=baseActor with {
+            Needs=new Dictionary<string,double>{
+                ["survival:thirst"]=20,["survival:hunger"]=75
+            }
+        };
+        Check(learner.Bias(baseActor.Id,AdaptiveExperiencePolicy.Situation(differentSituation),drink)==0,
+            "learning does not transfer across unrelated dominant needs");
+        var rejected=new ActionEpisode(baseActor.Id,2,drink.Kind,null,false,
+            "not_available",new EpisodeOutcome(0,0,0,0),null);
+        for(int n=0;n<10;n++)learner.Learn(baseActor,drink,rejected);
+        Check(learner.Bias(baseActor.Id,thirsty,drink)<0,
+            "failed actions produce bounded negative preference");
+        for(int i=0;i<4;i++)
+            learner.Learn(baseActor,new ActionProposal(baseActor.Id,"survival:wait"),
+                new ActionEpisode(baseActor.Id,i,"survival:wait",null,true,
+                    "accepted",new EpisodeOutcome(0,0,0,0),null));
+        learner.Learn(differentSituation,drink,good);
+        Check(learner.RetainedPreferences==2 &&
+            learner.TotalUpdates==17 &&
+            learner.Inspect(baseActor.Id).Count==2,
+            "bounded deterministic eviction retains only configured actor preferences");
+        bool invalid=false;
+        try{_ = new AdaptiveExperiencePolicy(0);}catch(ArgumentOutOfRangeException){invalid=true;}
+        Check(invalid,"invalid adaptive capacity rejected");
+
+        var neutral=baseActor with {
+            Needs=new Dictionary<string,double>(),
+            Inventory=new Dictionary<string,int>{{"survival:water",1}}
+        };
+        var packet=new ObservationPacket(1,1,.5,
+            new Dictionary<string,int>(),new Dictionary<string,bool>(),[],[]);
+        var behavior=new SurvivalBehavior();
+        var baseChoice=behavior.Choose(neutral,packet,new ExperienceProbeContext(false));
+        var adaptedChoice=behavior.Choose(neutral,packet,new ExperienceProbeContext(true));
+        Check(baseChoice.Proposal.Kind=="survival:sleep" &&
+            adaptedChoice.Proposal.Kind=="survival:drink" &&
+            behavior.TryFastDecision(neutral,packet,new ExperienceProbeContext(true))==null &&
+            behavior.TryProve(neutral,packet,new ExperienceProbeContext(true))==null,
+            "bounded experience bias changes a close decision and disables unaudited fast paths");
+
+        EngineResults RunExperience(int seed,bool enabled){
+            var world=new SurvivalWorld(domain,new SurvivalConfig(seed,24,8,3,.65));
+            return new Engine(world,domain,host,new EngineOptions(
+                AdaptiveActionPolicy:enabled,MaxActionEpisodesPerAgent:5,
+                MaxExperiencePreferencesPerAgent:16)).Run();
+        }
+        foreach(int seed in new[]{45,83,127}){
+            var reference=RunExperience(seed,false);
+            var experimental=RunExperience(seed,true);
+            var repeat=RunExperience(seed,true);
+            Check(experimental.TraceHash==repeat.TraceHash &&
+                experimental.World.ResourcesBalanced && reference.World.ResourcesBalanced &&
+                experimental.World.Turns==reference.World.Turns,
+                "adaptive policy seed replay is deterministic and conserves resources "+seed);
+            Check(reference.ExperienceUpdates==0 && reference.TotalActionEpisodes==0 &&
+                experimental.ExperienceUpdates==experimental.TotalActionEpisodes &&
+                experimental.ExperienceUpdates>0 &&
+                experimental.RetainedExperiencePreferences<=24*16 &&
+                experimental.ActionEpisodes.Count<=24*5,
+                "adaptive learning is private, bounded and consumes real episodes "+seed);
+        }
     }
 
     // Stage 013: observational episodic history. Zero influence on choices.
@@ -229,6 +341,42 @@ static class Program {
         return 0;
     }
 
+    static int CompareAdaptiveLearning(DomainRegistry domain,ModuleHost host){
+        var rows=new List<object>();
+        foreach(int seed in new[]{41,64,87,110,133,156,179,202}){
+            EngineResults RunMode(bool learning){
+                var world=new SurvivalWorld(domain,new SurvivalConfig(seed,24,12,3,.65));
+                return new Engine(world,domain,host,new EngineOptions(
+                    AdaptiveActionPolicy:learning,
+                    MaxExperiencePreferencesPerAgent:24,
+                    MaxActionEpisodesPerAgent:8)).Run();
+            }
+            var baseline=RunMode(false);
+            var learned=RunMode(true);
+            var replay=RunMode(true);
+            if(!baseline.World.ResourcesBalanced||!learned.World.ResourcesBalanced||
+               learned.TraceHash!=replay.TraceHash)
+                throw new InvalidOperationException("Adaptive A/B invariant or replay failed");
+            rows.Add(new{
+                seed,
+                baselineHealth=baseline.World.AverageHealth,
+                adaptedHealth=learned.World.AverageHealth,
+                baselineAlive=baseline.World.Alive,
+                adaptedAlive=learned.World.Alive,
+                baselineRejected=baseline.World.Rejected,
+                adaptedRejected=learned.World.Rejected,
+                differentTrace=baseline.TraceHash!=learned.TraceHash,
+                experienceUpdates=learned.ExperienceUpdates,
+                learnedEntries=learned.RetainedExperiencePreferences
+            });
+        }
+        Console.WriteLine(JsonSerializer.Serialize(new{
+            disclaimer="Paired synthetic seeds; immediate proxy is heuristic, no held-out policy validation or causal/general improvement claim.",
+            agents=24,days=12,rows
+        },new JsonSerializerOptions{WriteIndented=true}));
+        return 0;
+    }
+
     static int Simulate(DomainRegistry d,ModuleHost host,string[] args){
         int seed=args.Length>1?int.Parse(args[1]):42;
         int agents=args.Length>2?int.Parse(args[2]):24;
@@ -250,6 +398,7 @@ static class Program {
     static int Tests(string root,DomainRegistry d,ModuleHost host){
         try{
             TestEpisodicOutcomes(d,host);
+            TestAdaptiveExperiencePolicy(d,host);
             var single=Run(d,host,seed:42,days:10);
             Check(single.World.Turns==24*10*3,"all scheduled turns");
             Check(single.World.ResourcesBalanced,"conservation across recipes and transfers");
